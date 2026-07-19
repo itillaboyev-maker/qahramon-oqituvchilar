@@ -1,74 +1,143 @@
-# Project State — Single Source of Truth
+# PROJECT STATE
 
-**Last updated:** Stages 0–10 complete (see `/CHANGELOG.md` for full history).
+**Project:** Qahramon O‘qituvchilar
 
-**Read this file, `DECISIONS.md`, and `CHANGELOG.md` before writing any code.**
+**Repository:**
+https://github.com/itillaboyev-maker/qahramon-oqituvchilar
+
+**Branch:**
+main
 
 ---
 
-## Where we are right now
+# CURRENT STATUS
 
-- **Deployment status: NOT deployed.** Still deliberately paused (see `DECISIONS.md`
-  D006). `docs/DEPLOYMENT.md` has full deploy steps; `docs/PRODUCTION_CHECKLIST.md` has
-  the pre-launch checklist. Both are ready for when deployment resumes.
-- **Build status: verified working.** `npx tsc --noEmit` and
-  `npx wrangler deploy --dry-run` both pass as of the end of Stage 10 (561.55 KiB
-  bundle). Re-verify both after every future change — mandatory, not optional (D013).
-- **Stage plan — all complete:**
+## Overall
 
-| Stage | Content | Status |
-|---|---|---|
-| 0 | Fix `@/` import-alias build bug | ✅ Done |
-| 1 | "Kim haqida?" flow, default emphasis on "boshqa ustoz" | ✅ Done |
-| 2 | Media attaches via recommendation only + bot photo/video step | ✅ Done |
-| 3 | Teacher Identity Resolution MVP | ✅ Done |
-| 4 | Teacher aggregation view + community recommendation count | ✅ Done |
-| 5 | Moderator review queue + Merge workflow (folded in, D016) | ✅ Done |
-| 6 | Approval workflow hardening + Self-submission flow (folded in, D016) | ✅ Done |
-| 7 | Media pipeline hardening (limits, dedup, size validation) | ✅ Done |
-| 8 | Search & filtering (moderator-only, admin bot) | ✅ Done |
-| 9 | Observability: structured logging, global error handling, audit logging | ✅ Done |
-| 10 | Production hardening: rate limiting, input validation | ✅ Done |
+Production MVP is under active development.
 
-**Next milestone:** resume deployment (`docs/DEPLOYMENT.md`), work through
-`docs/PRODUCTION_CHECKLIST.md`, then run the end-to-end test checklist against a live
-environment before inviting real users.
+Architecture is considered stable.
 
-## What's implemented and working
+Repository is the single source of truth.
 
-- **Database:** Full schema + migration (`migrations/0000_init.sql`, seeded regions),
-  including `merged_into_teacher_id` (lossless merge tracking) and full `audit_logs`
-  usage. See `docs/DATABASE.md`.
-- **Public bot:** subscription gate → "Kim haqida?" (default: boshqa ustoz) → fast
-  nomination flow OR self-submission flow, both sharing `SubmitNominationUseCase`.
-  Media (photo/video) collection with limits/dedup/size checks. Rate-limited and
-  input-validated.
-- **Admin bot:** `/queue` (moderation, shows community count), `/merge_queue`
-  (Identity-Resolution-flagged duplicate review), `/search` (moderator-only teacher
-  lookup). All actions RBAC-gated and audit-logged.
-- **Teacher Identity Resolution:** transliteration + fuzzy name matching + weighted
-  multi-attribute scoring → auto-attach / log-candidate / plain-create three-way
-  decision. Never merges on name alone.
-- **Merge workflow:** moderator-confirmed only; older profile wins; loser archived
-  (never deleted), all recommendations reassigned.
-- **Observability:** structured JSON logging, global error handlers on both bots and
-  the Worker entrypoint, full audit trail for moderation/merge actions.
+---
 
-## What's deliberately NOT built (see ROADMAP.md for the full list)
+# COMPLETED
 
-AI embeddings/pgvector, AI moderation, AI biography generation, R2 storage + virus
-scanning + EXIF stripping, public web portal/API/search, Community/Trust/Hero
-scoring (explicitly not planned — would conflict with D002), automated test suite.
+* Cloudflare Worker configured
+* Public Telegram Bot implemented
+* Admin Telegram Bot implemented
+* Neon PostgreSQL connected
+* Drizzle ORM configured
+* DDD structure established
+* Repository Pattern implemented
+* CQRS structure implemented
+* Session management implemented
+* Recommendation flow implemented
+* Media collection implemented
+* Rate limiting implemented
+* Validation implemented
+* Region dataset corrected
+* Duplicate Farg‘ona region removed
+* District mapping fixed
+* Git initialized
+* GitHub repository connected
+* Repository synchronized with GitHub
+* AI handoff documentation created
 
-## Known technical debt
+---
 
-- Identity Resolution's candidate prefilter does a sequential scan (not index-backed) —
-  see DATABASE.md for why, and the scale at which to revisit.
-- `years_of_experience` not collected by either bot flow yet.
-- No automated tests exist. `TeacherIdentityResolver`/`fullNameSimilarity` are pure
-  functions and would be the highest-value first tests.
-- Wrangler on v3.x; v4.x available, not upgraded (deliberate, avoid unrelated risk).
+# CURRENT TASK
 
-## Environment / secrets
+**Production Priority #1**
 
-Not yet provisioned (deployment paused). Full list in `docs/DEPLOYMENT.md`.
+Investigate and fix the Media Pipeline.
+
+Current audit indicates:
+
+* Telegram handler collects media correctly.
+* DTO passes media correctly.
+* SubmitNominationUseCase persists media.
+* MediaRepository stores media.
+
+Primary investigation target:
+
+`src/infrastructure/telegram/admin-bot/handlers/moderation-queue.handler.ts`
+
+Goal:
+
+Ensure every submitted photo and video appears correctly in the moderator queue.
+
+---
+
+# NEXT TASKS
+
+1. Complete Media Pipeline.
+2. Complete Teacher Phone persistence.
+3. Complete Moderator Queue.
+4. Complete Publish Pipeline.
+5. Add AI Assistance interfaces.
+
+---
+
+# ARCHITECTURE DECISIONS
+
+Do not redesign the system.
+
+Keep:
+
+* Cloudflare Workers
+* TypeScript
+* grammY
+* Neon PostgreSQL
+* Drizzle ORM
+* DDD
+* CQRS
+* Repository Pattern
+* Ports & Adapters
+
+Business logic belongs only in UseCases.
+
+Repositories manage persistence.
+
+Telegram handlers must remain transport-only.
+
+---
+
+# KNOWN ISSUES
+
+* Media is not visible in moderator notifications.
+* Teacher phone persistence is only partially implemented.
+
+---
+
+# DEPLOYMENT
+
+Cloudflare Worker:
+qahramon-oqituvchilar
+
+Deployment:
+
+npm run deploy
+
+Logs:
+
+npx wrangler tail
+
+---
+
+# GITHUB
+
+Repository:
+
+https://github.com/itillaboyev-maker/qahramon-oqituvchilar
+
+Default branch:
+
+main
+
+---
+
+# LAST UPDATE
+
+Update this file after every completed production milestone.
