@@ -1,0 +1,13 @@
+{
+	"nomination.teacher_name_too_long": "Name is too long — please shorten (max 256 chars).",
+	"nomination.invalid_region": "Invalid region selected. Please try again.",
+	"nomination.invalid_district": "Invalid district selected. Please choose again.",
+	"nomination.invalid_relationship": "Invalid relationship selected.",
+	"nomination.ask_teacher_phone": "Enter the teacher's phone number or share a contact (optional):",
+	"nomination.btn_share_contact": "📱 Share Contact",
+	"nomination.phone_invalid": "The phone number looks invalid. Please try again or skip it.",
+	"menu.cancelled": "Flow cancelled."
+	,"menu.no_active_flow": "No active flow to cancel."
+	,"menu.unknown_button": "Unknown button — please use the menu."
+	,"menu.unknown_input_in_flow": "You're currently in a flow — please follow the prompts or send /cancel to abort."
+}

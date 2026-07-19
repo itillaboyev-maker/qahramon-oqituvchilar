@@ -1,0 +1,15 @@
+name = "qahramon-oqituvchilar"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Secrets (set via `wrangler secret put <NAME>`, never committed):
+#   DATABASE_URL           - Supabase Postgres connection string (pooled, port 6543)
+#   PUBLIC_BOT_TOKEN       - Telegram token for the public-facing bot
+#   ADMIN_BOT_TOKEN        - Telegram token for the moderator/admin bot
+#   PUBLIC_BOT_WEBHOOK_SECRET
+#   ADMIN_BOT_WEBHOOK_SECRET
+#   REQUIRED_CHANNEL_ID    - e.g. "@qahramon_oqituvchilar"
+
+[vars]
+ENVIRONMENT = "production"
