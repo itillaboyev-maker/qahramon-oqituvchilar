@@ -29,6 +29,20 @@
       "when": 1784188421000,
       "tag": "0003_fix_region_dataset",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1784188422000,
+      "tag": "0004_fix_tashkent_region_mapping",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1784188423000,
+      "tag": "0005_final_tashkent_cleanup",
+      "breakpoints": true
     }
   ]
 }

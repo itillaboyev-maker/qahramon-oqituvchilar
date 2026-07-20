@@ -295,7 +295,7 @@ case "recommender_phone": {
       if (callbackData.startsWith("district:")) {
         const districtId = callbackData.split(":")[1]!;
         // ensure district belongs to previously-selected region
-        const regionId = data.regionId as string | undefined;
+        const regionId = data.regionId ask string | undefined;
         const [districtRow] = await db.select().from(districts).where(eq(districts.id, districtId)).limit(1);
         if (!districtRow || (regionId && String(districtRow.regionId) !== String(regionId))) {
           await ctx.answerCallbackQuery();
