@@ -1,4 +1,4 @@
-import { InlineKeyboard, type Context } from "grammy";
+import { InlineKeyboard, Keyboard, type Context } from "grammy";
 import { eq } from "drizzle-orm";
 import type { Database } from "../../../db/client";
 import { regions, districts } from "../../../db/schema";
@@ -9,21 +9,9 @@ import type { Relationship, MediaType } from "../../../../domain/enums";
 import { t } from "../../../../i18n/translate";
 import { MEDIA_LIMITS } from "../../../../shared/constants/media.constants";
 import { logger } from "../../../logging/logger";
+
 import { TEXT_LIMITS } from "../../../../shared/constants/security.constants";
-
-/**
- * Fast nomination flow (product decision #5: under 2 minutes for the essential path).
- * Essential steps: teacher name -> region -> district -> school -> relationship
- * -> "why recommend" -> media (optional) -> recommender contact (optional) -> consent.
- * Media collected here becomes `NominationMediaItem[]`, attached to the recommendation
- * (never the teacher) inside SubmitNominationUseCase — see business rule H.
- *
- * NOTE (MVP pragmatism): region/district lookups query the DB directly here rather
- * than through a dedicated ReferenceDataRepository port — reference data is read-only
- * and rarely changes, so this is an acceptable shortcut for launch. Promote to a proper
- * port if/when this logic needs to be reused outside the bot (e.g. a future website).
- */
-
+import type { R2MediaStorageService } from "../../../storage/R2MediaStorageService";
 type Step =
   | "teacher_name"
   | "region"
@@ -53,6 +41,8 @@ export function registerNominationFlow(
   db: Database,
   sessionStore: SessionStorePort,
   submitNomination: SubmitNominationUseCase,
+  r2StorageService: R2MediaStorageService | null,
+  botToken?: string,
 ) {
   return {
     async start(ctx: Context, userId: string) {
@@ -103,22 +93,28 @@ export function registerNominationFlow(
           return true;
         }
 
-        case "teacher_phone": {
-          const value = text.trim();
-          if (!value) {
-            await ctx.reply(t("nomination.ask_teacher_phone"));
-            return true;
-          }
-          const normalized = this.normalizePhone(value);
-          if (!normalized) {
-            await ctx.reply(t("nomination.phone_invalid"));
-            return true;
-          }
-          data.teacherPhone = normalized;
-          await this.askRelationship(ctx, session.id, data);
-          return true;
-        }
+      case "teacher_phone": {
+  const contactPhone = ctx.message?.contact?.phone_number;
+  const value = contactPhone ?? text.trim();
 
+  if (!value) {
+    await ctx.reply(t("nomination.ask_teacher_phone"));
+    return true;
+  }
+
+  const normalized = this.normalizePhone(value);
+
+  if (!normalized) {
+    await ctx.reply(t("nomination.phone_invalid"));
+    return true;
+  }
+
+  data.teacherPhone = normalized;
+
+  await this.askRelationship(ctx, session.id, data);
+
+  return true;
+}
 
         case "recommendation_text": {
           data.recommendationText = text.trim();
@@ -134,29 +130,36 @@ export function registerNominationFlow(
           await this.askMedia(ctx, session.id, data);
           return true;
         }
-      case "recommender_name": {
-  const value = text.trim();
+        case "recommender_name": {
+          const value = text.trim();
 
-  if (!value) {
-    await ctx.reply(t("nomination.ask_recommender_name"));
-    return true;
-  }
+          if (!value) {
+            await ctx.reply(t("nomination.ask_recommender_name"));
+            return true;
+          }
 
-  data.recommenderName = value;
+          data.recommenderName = value;
 
-  await this.askRecommenderPhone(ctx, session.id, data);
-  return true;
-}
+          await this.askRecommenderPhone(ctx, session.id, data);
+          return true;
+        }
 
-case "recommender_phone": {
-  const value = text.trim();
+       case "recommender_phone": {
+  const value = text.trim().toLowerCase();
 
   if (!value) {
     await ctx.reply(t("nomination.ask_recommender_phone"));
     return true;
   }
 
-  data.recommenderPhone = value;
+  if (
+    ["bilmayman", "bilmiman", "bilmayman.", "yo'q", "yoq", "yo‘q"]
+      .includes(value)
+  ) {
+    data.recommenderPhone = null;
+  } else {
+    data.recommenderPhone = text.trim();
+  }
 
   await this.askConsent(ctx, session.id, data);
   return true;
@@ -166,16 +169,6 @@ case "recommender_phone": {
       }
     },
 
-    /**
-     * Handles an incoming photo or video during the "media" step. Stays on the same
-     * step so the person can send several items in a row before tapping "Tayyor."
-     * Returns false (unhandled) if the session isn't currently expecting media,
-     * so the router can fall back to its default behavior.
-     *
-     * Stage 7 hardening: enforces a max item count (abuse prevention), rejects
-     * oversized videos (Telegram's own getFile 20MB limit — relevant to any future
-     * R2 migration), and skips exact re-uploads of the same file within one submission.
-     */
     async handleMedia(
       ctx: Context,
       userId: string,
@@ -209,8 +202,35 @@ case "recommender_phone": {
         await ctx.reply(t("nomination.media_duplicate"), { reply_markup: kb });
         return true;
       }
+      if (!r2StorageService || !botToken) {
+        await ctx.reply("Media upload is unavailable. Iltimos, keyinroq urinib ko'ring.");
+        return true;
+      }
 
-      existing.push({ mediaType, telegramFileId: fileId, telegramFileUniqueId: fileUniqueId });
+      try {
+        const uploadResult = await r2StorageService.uploadFromTelegram({
+          botToken,
+          fileId,
+          recommendationId: null,
+          userId,
+        });
+
+        existing.push({
+          mediaType,
+          telegramFileId: fileId,
+          telegramFileUniqueId: fileUniqueId,
+          objectKey: uploadResult.objectKey,
+          bucketName: uploadResult.bucketName,
+          mimeType: uploadResult.mimeType,
+          sizeBytes: uploadResult.sizeBytes,
+          checksumSha256: uploadResult.checksumSha256,
+        });
+      } catch (err) {
+        logger.error("media_upload_failed", { error: (err as Error).message, userId, fileId });
+        await ctx.reply("Media upload failed. Iltimos, qayta urinib ko'ring.");
+        return true;
+      }
+
       data.media = existing;
 
       await sessionStore.update(session.id, { collectedData: data });
@@ -227,13 +247,23 @@ case "recommender_phone": {
       await ctx.reply(t("nomination.ask_media"), { reply_markup: kb });
     },
 
-    async askTeacherPhone(ctx: Context, sessionId: string, data: Record<string, unknown>) {
-      const kb = new InlineKeyboard()
-        .text(t("nomination.btn_share_contact"), "teacher_phone:share").row()
-        .text(t("nomination.btn_skip"), "teacher_phone:skip");
-      await sessionStore.update(sessionId, { currentStep: "teacher_phone", collectedData: data });
-      await ctx.reply(t("nomination.ask_teacher_phone"), { reply_markup: kb });
-    },
+   async askTeacherPhone(ctx: Context, sessionId: string, data: Record<string, unknown>) {
+  const kb = new Keyboard()
+    .requestContact(t("nomination.btn_share_contact"))
+    .row()
+    .text(t("nomination.btn_skip"))
+    .resized()
+    .oneTime();
+
+  await sessionStore.update(sessionId, {
+    currentStep: "teacher_phone",
+    collectedData: data,
+  });
+
+  await ctx.reply(t("nomination.ask_teacher_phone"), {
+    reply_markup: kb,
+  });
+},
 
     async askRelationship(ctx: Context, sessionId: string, data: Record<string, unknown>) {
       const kb = new InlineKeyboard();
@@ -245,16 +275,23 @@ case "recommender_phone": {
     },
 
     async askRecommenderName(ctx: Context, sessionId: string, data: Record<string, unknown>) {
-    
       await sessionStore.update(sessionId, { currentStep: "recommender_name", collectedData: data });
       await ctx.reply(t("nomination.ask_recommender_name"));
     },
 
     async askRecommenderPhone(ctx: Context, sessionId: string, data: Record<string, unknown>) {
-    
-      await sessionStore.update(sessionId, { currentStep: "recommender_phone", collectedData: data });
-      await ctx.reply(t("nomination.ask_recommender_phone"));
-    },
+  const kb = new InlineKeyboard()
+    .text(t("nomination.btn_skip"), "recommender_phone:skip");
+
+  await sessionStore.update(sessionId, {
+    currentStep: "recommender_phone",
+    collectedData: data,
+  });
+
+  await ctx.reply(t("nomination.ask_recommender_phone"), {
+    reply_markup: kb,
+  });
+},
 
     async askConsent(ctx: Context, sessionId: string, data: Record<string, unknown>) {
       const kb = new InlineKeyboard()
@@ -271,7 +308,6 @@ case "recommender_phone": {
 
       if (callbackData.startsWith("region:")) {
         const regionId = callbackData.split(":")[1]!;
-        // Validate region exists before proceeding
         const [regionRow] = await db.select().from(regions).where(eq(regions.id, regionId)).limit(1);
         if (!regionRow) {
           await ctx.answerCallbackQuery();
@@ -294,8 +330,7 @@ case "recommender_phone": {
 
       if (callbackData.startsWith("district:")) {
         const districtId = callbackData.split(":")[1]!;
-        // ensure district belongs to previously-selected region
-        const regionId = data.regionId ask string | undefined;
+        const regionId = data.regionId as string | undefined;
         const [districtRow] = await db.select().from(districts).where(eq(districts.id, districtId)).limit(1);
         if (!districtRow || (regionId && String(districtRow.regionId) !== String(regionId))) {
           await ctx.answerCallbackQuery();
@@ -401,8 +436,6 @@ case "recommender_phone": {
           await ctx.reply(t("nomination.done"));
         } catch (err) {
           logger.error("submit_nomination_failed", { error: (err as Error).message, userId });
-          // Stage 10: rate-limit/validation errors are expected, user-facing conditions
-          // — surface them plainly rather than letting them fall through to bot.catch.
           await ctx.reply((err as Error).message);
         }
         return true;

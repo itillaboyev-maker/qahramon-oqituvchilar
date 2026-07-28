@@ -1,4 +1,4 @@
-import { Bot } from "grammy";
+import { Bot, InlineKeyboard } from "grammy";
 import type { Container } from "../../config/di-container";
 import { subscriptionGuard } from "./middleware/subscription-guard.middleware";
 import { startHandler, checkSubscriptionHandler } from "./handlers/start.handler";
@@ -23,27 +23,18 @@ export function buildPublicBot(botToken: string, requiredChannelId: string, cont
     void err.ctx.reply("Kechirasiz, xatolik yuz berdi. Iltimos /start buyrug'ini qayta yuboring.").catch(() => {});
   });
 
-  const nomination = registerNominationFlow(container.db, container.sessionStore, submitNomination);
-  const selfSubmission = registerSelfSubmissionFlow(container.db, container.sessionStore, submitNomination);
-
-  // /start is exempt from the guard so a first-time user can see the join prompt.
-  bot.command("start", startHandler(registerUser));
-
-  // Allow users to cancel any in-progress flow and return to the main menu.
-  bot.command("cancel", async (ctx) => {
-    const userId = ctx.from?.id;
-    if (!userId) return;
-    const user = await container.repos.userRepo.findByTelegramId(userId);
-    if (!user) return;
-    const session = await container.sessionStore.get(user.id, "public");
-    if (session) {
-      await container.sessionStore.clear(session.id);
-      await ctx.reply(t("menu.cancelled"));
-    } else {
-      await ctx.reply(t("menu.no_active_flow"));
-    }
-    await ctx.reply(t("menu.title"), { reply_markup: mainMenuKeyboard() });
-  });
+  const nomination = registerNominationFlow(
+    container.db,
+    container.sessionStore,
+    submitNomination,
+    container.r2StorageService,
+    botToken,
+  );
+  const selfSubmission = registerSelfSubmissionFlow(
+    container.db,
+    container.sessionStore,
+    submitNomination,
+  );
 
   bot.use(subscriptionGuard(publicTelegramClient, requiredChannelId));
 
@@ -56,7 +47,34 @@ export function buildPublicBot(botToken: string, requiredChannelId: string, cont
     await ctx.answerCallbackQuery();
     await ctx.reply(t("who.question"), { reply_markup: whoIsThisAboutKeyboard() });
   });
+bot.callbackQuery("recommender_phone:skip", async (ctx) => {
+  await ctx.answerCallbackQuery();
 
+  const userId = ctx.from?.id;
+  if (!userId) return;
+
+  const user = await container.repos.userRepo.findByTelegramId(userId);
+  if (!user) return;
+
+  const session = await container.sessionStore.get(user.id, "public");
+  if (!session) return;
+
+  const data = { ...session.collectedData } as Record<string, unknown>;
+
+  data.recommenderPhone = null;
+
+  await container.sessionStore.update(session.id, {
+    currentStep: "consent",
+    collectedData: data,
+  });
+
+  await ctx.reply(t("nomination.consent_question"), {
+    reply_markup: new InlineKeyboard()
+      .text(t("nomination.btn_consent_yes"), "consent:yes")
+      .row()
+      .text(t("nomination.btn_consent_no"), "consent:no"),
+  });
+});
   bot.callbackQuery("who:teacher", async (ctx) => {
     const user = await container.repos.userRepo.findByTelegramId(ctx.from!.id);
     if (!user) return;
@@ -126,6 +144,8 @@ export function buildPublicBot(botToken: string, requiredChannelId: string, cont
     const user = await container.repos.userRepo.findByTelegramId(ctx.from!.id);
     if (!user) return;
     const largest = ctx.message.photo[ctx.message.photo.length - 1]!;
+    console.log("PUBLIC BOT FILE_ID:", largest.file_id);
+console.log("PUBLIC BOT BOT_ID:", ctx.me.id);
     (await nomination.handleMedia(ctx, user.id, "photo", largest.file_id, largest.file_unique_id, largest.file_size)) ||
       (await selfSubmission.handleMedia(ctx, user.id, "photo", largest.file_id, largest.file_unique_id, largest.file_size));
   });

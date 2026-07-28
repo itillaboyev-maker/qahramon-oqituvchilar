@@ -6,6 +6,8 @@ import { FindOrCreateTeacherUseCase } from "../teacher/find-or-create-teacher.us
 import { ValidationError, RateLimitExceededError } from "../../../domain/errors/domain-errors";
 import { RATE_LIMIT, TEXT_LIMITS } from "../../../shared/constants/security.constants";
 
+
+
 /**
  * The single use case behind "🌟 Menga katta ta'sir qilgan ustoz haqida".
  * Always: find-or-create the teacher, then attach a NEW recommendation to it.
@@ -13,12 +15,11 @@ import { RATE_LIMIT, TEXT_LIMITS } from "../../../shared/constants/security.cons
  * Media (business rule H) is attached to the recommendation, never to the teacher.
  */
 export class SubmitNominationUseCase {
-  constructor(
-    private readonly findOrCreateTeacher: FindOrCreateTeacherUseCase,
-    private readonly recommendationRepo: RecommendationRepositoryPort,
-    private readonly mediaRepo: MediaRepositoryPort,
-  ) {}
-
+constructor(
+  private readonly findOrCreateTeacher: FindOrCreateTeacherUseCase,
+  private readonly recommendationRepo: RecommendationRepositoryPort,
+  private readonly mediaRepo: MediaRepositoryPort,
+) {}
   async execute(dto: NominationDto): Promise<{ recommendation: Recommendation; teacherWasCreated: boolean }> {
     if (!dto.teacherFullName?.trim()) {
       throw new ValidationError("Teacher full name is required");
@@ -88,6 +89,12 @@ export class SubmitNominationUseCase {
           mediaType: item.mediaType,
           telegramFileId: item.telegramFileId,
           telegramFileUniqueId: item.telegramFileUniqueId ?? null,
+          storageProvider: item.objectKey ? "r2" : "telegram",
+          objectKey: item.objectKey ?? null,
+          bucketName: item.bucketName ?? null,
+          mimeType: item.mimeType ?? null,
+          sizeBytes: item.sizeBytes ?? null,
+          checksumSha256: item.checksumSha256 ?? null,
           uploadedBy: dto.submittedByUserId,
         });
       }

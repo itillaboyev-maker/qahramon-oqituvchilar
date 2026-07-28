@@ -28,8 +28,8 @@ export interface ModerateRecommendationInput {
  */
 export class ModerateRecommendationUseCase {
   constructor(
-    private readonly recommendationRepo: RecommendationRepositoryPort,
     private readonly userRepo: UserRepositoryPort,
+    private readonly recommendationRepo: RecommendationRepositoryPort,
     private readonly teacherRepo: TeacherRepositoryPort,
     private readonly auditLogRepo: AuditLogRepositoryPort,
   ) {}
@@ -46,13 +46,17 @@ export class ModerateRecommendationUseCase {
     }
 
     const nextStatus = this.resolveNextStatus(current.status, input.action);
-
+console.log("CURRENT STATUS:", current.status);
+console.log("ACTION:", input.action);
+console.log("NEXT STATUS:", nextStatus);
     const updated = await this.recommendationRepo.updateStatus(
-      input.recommendationId,
-      nextStatus,
-      input.moderatorUserId,
-      input.notes ?? null,
-    );
+  input.recommendationId,
+  nextStatus,
+  input.moderatorUserId,
+  input.notes ?? null,
+);
+
+console.log("UPDATED STATUS:", updated.status);
 
     await this.auditLogRepo.record({
       actorUserId: input.moderatorUserId,

@@ -4,6 +4,12 @@ export interface NominationMediaItem {
   mediaType: MediaType;
   telegramFileId: string;
   telegramFileUniqueId?: string;
+  // R2 metadata (populated when uploaded to R2)
+  objectKey?: string | null;
+  bucketName?: string | null;
+  mimeType?: string | null;
+  sizeBytes?: number | null;
+  checksumSha256?: string | null;
 }
 
 /**

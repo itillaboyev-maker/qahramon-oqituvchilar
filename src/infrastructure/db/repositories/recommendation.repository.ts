@@ -62,28 +62,38 @@ export class RecommendationRepository implements RecommendationRepositoryPort {
     return row?.value ?? 0;
   }
 
-  async updateStatus(
-    id: string,
-    status: Recommendation["status"],
-    moderatedBy: string,
-    moderationNotes?: string | null,
-  ): Promise<Recommendation> {
-    const [row] = await this.db
-      .update(recommendations)
-      .set({
-        status,
-        moderatedBy,
-        moderatedAt: sql`now()`,
-        moderationNotes: moderationNotes ?? null,
-        updatedAt: sql`now()`,
-      })
-      .where(eq(recommendations.id, id))
-      .returning();
+ async updateStatus(
+  id: string,
+  status: Recommendation["status"],
+  moderatedBy: string,
+  moderationNotes?: string | null,
+): Promise<Recommendation> {
 
-    if (!row) throw new Error(`Recommendation not found: ${id}`);
-    return row as Recommendation;
+  console.log("========== UPDATE STATUS ==========");
+  console.log("Recommendation ID:", id);
+  console.log("New status:", status);
+
+  const [row] = await this.db
+    .update(recommendations)
+    .set({
+      status,
+      moderatedBy,
+      moderatedAt: sql`now()`,
+      moderationNotes: moderationNotes ?? null,
+      updatedAt: sql`now()`,
+    })
+    .where(eq(recommendations.id, id))
+    .returning();
+
+  console.log("Returned row:", row);
+  console.log("==================================");
+
+  if (!row) {
+    throw new Error(`Recommendation not found: ${id}`);
   }
 
+  return row as Recommendation;
+}
   async listByTeacherId(teacherId: string): Promise<Recommendation[]> {
     const rows = await this.db
       .select()

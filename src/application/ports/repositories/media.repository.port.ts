@@ -7,6 +7,12 @@ export interface CreateMediaInput {
   telegramFileId: string;
   telegramFileUniqueId?: string | null;
   uploadedBy?: string | null;
+  storageProvider?: "telegram" | "r2";
+  objectKey?: string | null;
+  bucketName?: string | null;
+  mimeType?: string | null;
+  sizeBytes?: number | null;
+  checksumSha256?: string | null;
 }
 
 export interface MediaRepositoryPort {

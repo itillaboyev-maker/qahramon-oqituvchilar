@@ -13,6 +13,7 @@ export default {
       const container = buildContainer(env);
 
       if (url.pathname === "/webhook/public") {
+       
         if (request.headers.get("x-telegram-bot-api-secret-token") !== env.PUBLIC_BOT_WEBHOOK_SECRET) {
           logger.warn("public_webhook_auth_failed", { path: url.pathname });
           return new Response("Unauthorized", { status: 401 });
@@ -26,8 +27,20 @@ export default {
           logger.warn("admin_webhook_auth_failed", { path: url.pathname });
           return new Response("Unauthorized", { status: 401 });
         }
-        const bot = buildAdminBot(env.ADMIN_BOT_TOKEN, container);
-        return await webhookCallback(bot, "cloudflare-mod")(request);
+       const bot = buildAdminBot(
+  env.ADMIN_BOT_TOKEN,
+  container,
+  env,
+);
+        logger.info("before_webhook_callback");
+
+const response = await webhookCallback(bot, "cloudflare-mod")(request);
+
+logger.info("after_webhook_callback", {
+  status: response.status,
+});
+
+return response;
       }
 
       return new Response("Qahramon O'qituvchilar API — see /webhook/public and /webhook/admin", {

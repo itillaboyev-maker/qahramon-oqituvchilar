@@ -4,7 +4,7 @@
 	"nomination.invalid_district": "Invalid district selected. Please choose again.",
 	"nomination.invalid_relationship": "Invalid relationship selected.",
 	"nomination.ask_teacher_phone": "Enter the teacher's phone number or share a contact (optional):",
-	"nomination.btn_share_contact": "📱 Share Contact",
+	"nomination.btn_share_contact": "📱 Telefon raqamimni ulashish",
 	"nomination.phone_invalid": "The phone number looks invalid. Please try again or skip it.",
 	"menu.cancelled": "Flow cancelled."
 	,"menu.no_active_flow": "No active flow to cancel."
