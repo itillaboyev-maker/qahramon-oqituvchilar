@@ -36,10 +36,14 @@ export function buildPublicBot(botToken: string, requiredChannelId: string, cont
     submitNomination,
   );
 
+   bot.command("start", startHandler(registerUser));
+
+  bot.callbackQuery(
+    "check_subscription",
+    checkSubscriptionHandler(publicTelegramClient, requiredChannelId),
+  );
+
   bot.use(subscriptionGuard(publicTelegramClient, requiredChannelId));
-
-  bot.callbackQuery("check_subscription", checkSubscriptionHandler());
-
   // Business rule A: always ask "who is this about" before any submission starts.
   // "Boshqa ustoz" is the encouraged default — emphasized in the keyboard itself
   // (see whoIsThisAboutKeyboard), not by skipping the question.

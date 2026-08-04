@@ -13,3 +13,12 @@ compatibility_flags = ["nodejs_compat"]
 
 [vars]
 ENVIRONMENT = "production"
+[[r2_buckets]]
+binding = "R2_BUCKET"
+bucket_name = "qahramon-ustozlar-media"
+[observability]
+enabled = true
+
+[observability.logs]
+enabled = true
+invocation_logs = true

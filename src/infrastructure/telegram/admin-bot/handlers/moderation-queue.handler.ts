@@ -74,6 +74,18 @@ export function registerModerationQueue(
           ),
           mediaRepo.listByRecommendationIds([rec.id]),
         ]);
+
+
+        console.log(
+  "MEDIA COUNT:",
+  mediaList.length,
+  mediaList.map((m) => ({
+    type: m.mediaType,
+    objectKey: m.objectKey,
+    telegramFileId: m.telegramFileId,
+  })),
+);
+
       const text = [
         `Navbatda: ${totalPending} ta ariza`,
         "",
@@ -92,49 +104,72 @@ export function registerModerationQueue(
   `mod:review:${rec.id}`,
 );
 
-      const photo = mediaList.find((m) => m.mediaType === "photo");
+     
+const r2Bucket = (env as { R2_BUCKET?: R2Bucket }).R2_BUCKET;
+let sent = false;
 
-      let sentPhoto = false;
-      const r2Bucket = (env as unknown as { R2_BUCKET?: R2Bucket }).R2_BUCKET;
+for (const media of mediaList) {
+  try {
+    if (r2Bucket && media.objectKey) {
+      const object = await r2Bucket.get(media.objectKey);
 
-      if (photo?.objectKey && r2Bucket) {
-        try {
-          const r2Object = await r2Bucket.get(photo.objectKey);
-          if (r2Object) {
-            const arrayBuffer = await r2Object.arrayBuffer();
-            const filename = photo.objectKey.split("/").pop() ?? "photo.jpg";
-            await ctx.replyWithPhoto(new InputFile(new Uint8Array(arrayBuffer), filename), {
-              caption: text,
+      if (object) {
+        const bytes = new Uint8Array(await object.arrayBuffer());
+        const filename = media.objectKey.split("/").pop() ?? "media";
+
+        if (media.mediaType === "photo") {
+          await ctx.replyWithPhoto(
+            new InputFile(bytes, filename),
+            {
+              caption: !sent ? text : undefined,
               parse_mode: "HTML",
-              reply_markup: kb,
-            });
-            sentPhoto = true;
-          }
-        } catch (err) {
-          console.error("R2 media send error:", err);
+              reply_markup: !sent ? kb : undefined,
+            },
+          );
+        } else if (media.mediaType === "video") {
+          await ctx.replyWithVideo(
+            new InputFile(bytes, filename),
+            {
+              caption: !sent ? text : undefined,
+              parse_mode: "HTML",
+              reply_markup: !sent ? kb : undefined,
+            },
+          );
         }
-      }
 
-      if (!sentPhoto && photo?.telegramFileId) {
-        try {
-          await ctx.replyWithPhoto(photo.telegramFileId, {
-            caption: text,
-            parse_mode: "HTML",
-            reply_markup: kb,
-          });
-          sentPhoto = true;
-        } catch (err) {
-          console.error("Telegram fallback photo send error:", err);
-        }
+        sent = true;
+        continue;
       }
+    }
 
-      // 3. Agar umuman rasm bo'lmasa yoki har ikkala usul ishlamasa — matn o'zini yuborish
-      if (!sentPhoto) {
-        await ctx.reply(text, {
+    if (media.telegramFileId) {
+      if (media.mediaType === "photo") {
+        await ctx.replyWithPhoto(media.telegramFileId, {
+          caption: !sent ? text : undefined,
           parse_mode: "HTML",
-          reply_markup: kb,
+          reply_markup: !sent ? kb : undefined,
+        });
+      } else if (media.mediaType === "video") {
+        await ctx.replyWithVideo(media.telegramFileId, {
+          caption: !sent ? text : undefined,
+          parse_mode: "HTML",
+          reply_markup: !sent ? kb : undefined,
         });
       }
+
+      sent = true;
+    }
+
+  } catch (err) {
+    console.error("Media send failed:", err);
+  }
+}
+if (!sent) {
+  await ctx.reply(text, {
+    parse_mode: "HTML",
+    reply_markup: kb,
+  });
+}
     },
 
     async handleAction(

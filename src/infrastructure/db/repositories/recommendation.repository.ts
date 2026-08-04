@@ -16,6 +16,9 @@ export class RecommendationRepository implements RecommendationRepositoryPort {
       .values({
         teacherId: input.teacherId,
         submittedByUserId: input.submittedByUserId ?? null,
+       
+        status: "new",
+       
         recommenderName: input.recommenderName ?? null,
         recommenderPhone: input.teacherPhone ?? input.recommenderPhone ?? null,
         relationship: input.relationship ?? null,

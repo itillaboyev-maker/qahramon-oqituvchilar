@@ -62,7 +62,11 @@ export function buildContainer(env: Env): Container {
   const r2StorageService = r2Bucket
     ? new R2MediaStorageService(r2Bucket, bucketName)
     : null;
-
+console.log("=== CONTAINER START ===");
+console.log("R2_BUCKET:", !!envRecord.R2_BUCKET);
+console.log("R2_BUCKET_NAME:", envRecord.R2_BUCKET_NAME);
+console.log("ENV KEYS:", Object.keys(env));
+console.log("=======================");
   const sessionStore = new PostgresSessionStore(db);
 
   // Repositories

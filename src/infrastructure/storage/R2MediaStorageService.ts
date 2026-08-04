@@ -10,11 +10,16 @@ export class R2MediaStorageService {
    * before recommendation creation). If missing, stored under a `pending` path.
    */
   async uploadFromTelegram(params: {
+    
     botToken: string;
     fileId: string;
     recommendationId?: string | null;
     userId: string;
   }) {
+    console.log("R2 UPLOAD START", {
+  fileId: params.fileId,
+  userId: params.userId,
+});
     // 1. Telegram getFile API orqali fayl yo'lini olish
     const fileRes = await fetch(`https://api.telegram.org/bot${params.botToken}/getFile?file_id=${params.fileId}`);
     const fileData = await fileRes.json() as any;
@@ -22,6 +27,7 @@ export class R2MediaStorageService {
     if (!fileData.ok || !fileData.result?.file_path) {
       throw new Error(`Telegram fayl yo'lini olib bo'lmadi: ${params.fileId}`);
     }
+    console.log("TELEGRAM FILE PATH", fileData.result.file_path);
 
     // 2. Telegram CDN'dan fayl baytlarini yuklab olish
     const downloadUrl = `https://api.telegram.org/file/bot${params.botToken}/${fileData.result.file_path}`;
@@ -32,6 +38,7 @@ export class R2MediaStorageService {
     }
 
     const arrayBuffer = await binaryRes.arrayBuffer();
+    console.log("DOWNLOADED SIZE", arrayBuffer.byteLength);
 
     // 3. SHA-256 Checksum hisoblash (Takroriy fayllarni aniqlash uchun)
     const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
@@ -60,12 +67,16 @@ export class R2MediaStorageService {
     if (params.recommendationId) {
       customMetadata.recommendationId = params.recommendationId;
     }
-
+console.log("R2 PUT START", {
+  objectKey,
+  size: arrayBuffer.byteLength,
+  mimeType,
+});
     await this.bucket.put(objectKey, arrayBuffer, {
       httpMetadata: { contentType: mimeType },
       customMetadata,
     });
-
+console.log("R2 PUT SUCCESS", objectKey);
     return {
       objectKey,
       bucketName: this.bucketName,

@@ -19,12 +19,36 @@ export function startHandler(registerUser: RegisterUserUseCase) {
     await ctx.reply(t("menu.title"), { reply_markup: mainMenuKeyboard() });
   };
 }
+export function checkSubscriptionHandler(
+  publicTelegramClient: {
+    getChatMember(chatId: string | number, userId: number): Promise<{ status: string }>;
+  },
+  requiredChannelId: string,
+) {
+ return async (ctx: Context) => {
+  if (!ctx.from) return;
 
-export function checkSubscriptionHandler() {
-  return async (ctx: Context) => {
-    // subscriptionGuard middleware already ran and let this through only if the
-    // person is now a member — reaching here means the check passed.
-    await ctx.answerCallbackQuery();
-    await ctx.reply(t("menu.title"), { reply_markup: mainMenuKeyboard() });
-  };
+  const member = await publicTelegramClient.getChatMember(
+    requiredChannelId,
+    ctx.from.id,
+  );
+
+  if (
+    member.status !== "member" &&
+    member.status !== "administrator" &&
+    member.status !== "creator"
+  ) {
+    await ctx.answerCallbackQuery({
+      text: "Avval kanalga a'zo bo'ling.",
+      show_alert: true,
+    });
+    return;
+  }
+
+  await ctx.answerCallbackQuery();
+
+  await ctx.reply(t("menu.title"), {
+    reply_markup: mainMenuKeyboard(),
+  });
+};
 }

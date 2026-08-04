@@ -28,15 +28,14 @@ type Step =
   | "consent";
 
 const RELATIONSHIP_LABELS: Record<Relationship, string> = {
-  student: "O'quvchisiman",
-  former_student: "Bitirgan o'quvchisiman",
-  parent: "Ota-onasiman",
-  colleague: "Hamkasbiman",
-  school_leader: "Maktab rahbariman",
-  community_member: "Jamoat vakiliman",
-  self: "O'zim",
+  student: "👨‍🎓 O'quvchisiman",
+  former_student: "🎓 Bitirgan o'quvchisiman",
+  parent: "👨‍👩‍👧 Yaqin qarindoshiman",
+  colleague: "🤝 Hamkasbiman",
+  school_leader: "🏫 Maktab rahbariman",
+  community_member: "🌍 Jamoat vakiliman",
+  self: "⭐ O'zim",
 };
-
 export function registerNominationFlow(
   db: Database,
   sessionStore: SessionStorePort,
@@ -93,28 +92,28 @@ export function registerNominationFlow(
           return true;
         }
 
-      case "teacher_phone": {
-  const contactPhone = ctx.message?.contact?.phone_number;
-  const value = contactPhone ?? text.trim();
+        case "teacher_phone": {
+          const contactPhone = ctx.message?.contact?.phone_number;
+          const value = contactPhone ?? text.trim();
 
-  if (!value) {
-    await ctx.reply(t("nomination.ask_teacher_phone"));
-    return true;
-  }
+          if (!value) {
+            await ctx.reply(t("nomination.ask_teacher_phone"));
+            return true;
+          }
 
-  const normalized = this.normalizePhone(value);
+          const normalized = this.normalizePhone(value);
 
-  if (!normalized) {
-    await ctx.reply(t("nomination.phone_invalid"));
-    return true;
-  }
+          if (!normalized) {
+            await ctx.reply(t("nomination.phone_invalid"));
+            return true;
+          }
 
-  data.teacherPhone = normalized;
+          data.teacherPhone = normalized;
 
-  await this.askRelationship(ctx, session.id, data);
+          await this.askRelationship(ctx, session.id, data);
 
-  return true;
-}
+          return true;
+        }
 
         case "recommendation_text": {
           data.recommendationText = text.trim();
@@ -144,26 +143,26 @@ export function registerNominationFlow(
           return true;
         }
 
-       case "recommender_phone": {
-  const value = text.trim().toLowerCase();
+        case "recommender_phone": {
+          const value = text.trim().toLowerCase();
 
-  if (!value) {
-    await ctx.reply(t("nomination.ask_recommender_phone"));
-    return true;
-  }
+          if (!value) {
+            await ctx.reply(t("nomination.ask_recommender_phone"));
+            return true;
+          }
 
-  if (
-    ["bilmayman", "bilmiman", "bilmayman.", "yo'q", "yoq", "yo‘q"]
-      .includes(value)
-  ) {
-    data.recommenderPhone = null;
-  } else {
-    data.recommenderPhone = text.trim();
-  }
+          if (
+            ["bilmayman", "bilmiman", "bilmayman.", "yo'q", "yoq", "yo‘q"]
+              .includes(value)
+          ) {
+            data.recommenderPhone = null;
+          } else {
+            data.recommenderPhone = text.trim();
+          }
 
-  await this.askConsent(ctx, session.id, data);
-  return true;
-}
+          await this.askConsent(ctx, session.id, data);
+          return true;
+        }
         default:
           return false;
       }
@@ -202,6 +201,9 @@ export function registerNominationFlow(
         await ctx.reply(t("nomination.media_duplicate"), { reply_markup: kb });
         return true;
       }
+      console.log("R2 SERVICE EXISTS:", !!r2StorageService);
+      console.log("BOT TOKEN EXISTS:", !!botToken);
+
       if (!r2StorageService || !botToken) {
         await ctx.reply("Media upload is unavailable. Iltimos, keyinroq urinib ko'ring.");
         return true;
@@ -247,23 +249,23 @@ export function registerNominationFlow(
       await ctx.reply(t("nomination.ask_media"), { reply_markup: kb });
     },
 
-   async askTeacherPhone(ctx: Context, sessionId: string, data: Record<string, unknown>) {
-  const kb = new Keyboard()
-    .requestContact(t("nomination.btn_share_contact"))
-    .row()
-    .text(t("nomination.btn_skip"))
-    .resized()
-    .oneTime();
+    async askTeacherPhone(ctx: Context, sessionId: string, data: Record<string, unknown>) {
+      const kb = new Keyboard()
+        .requestContact(t("nomination.btn_share_contact"))
+        .row()
+        .text(t("nomination.btn_skip"))
+        .resized()
+        .oneTime();
 
-  await sessionStore.update(sessionId, {
-    currentStep: "teacher_phone",
-    collectedData: data,
-  });
+      await sessionStore.update(sessionId, {
+        currentStep: "teacher_phone",
+        collectedData: data,
+      });
 
-  await ctx.reply(t("nomination.ask_teacher_phone"), {
-    reply_markup: kb,
-  });
-},
+      await ctx.reply(t("nomination.ask_teacher_phone"), {
+        reply_markup: kb,
+      });
+    },
 
     async askRelationship(ctx: Context, sessionId: string, data: Record<string, unknown>) {
       const kb = new InlineKeyboard();
@@ -280,18 +282,18 @@ export function registerNominationFlow(
     },
 
     async askRecommenderPhone(ctx: Context, sessionId: string, data: Record<string, unknown>) {
-  const kb = new InlineKeyboard()
-    .text(t("nomination.btn_skip"), "recommender_phone:skip");
+      const kb = new InlineKeyboard()
+        .text(t("nomination.btn_skip"), "recommender_phone:skip");
 
-  await sessionStore.update(sessionId, {
-    currentStep: "recommender_phone",
-    collectedData: data,
-  });
+      await sessionStore.update(sessionId, {
+        currentStep: "recommender_phone",
+        collectedData: data,
+      });
 
-  await ctx.reply(t("nomination.ask_recommender_phone"), {
-    reply_markup: kb,
-  });
-},
+      await ctx.reply(t("nomination.ask_recommender_phone"), {
+        reply_markup: kb,
+      });
+    },
 
     async askConsent(ctx: Context, sessionId: string, data: Record<string, unknown>) {
       const kb = new InlineKeyboard()
@@ -435,45 +437,54 @@ export function registerNominationFlow(
           await sessionStore.clear(session.id);
           await ctx.reply(t("nomination.done"));
         } catch (err) {
-          logger.error("submit_nomination_failed", { error: (err as Error).message, userId });
-          await ctx.reply((err as Error).message);
-        }
-        return true;
+          console.error(err);
+
+          logger.error("submit_nomination_failed", {
+            error: err instanceof Error ? err.stack : String(err),
+            userId,
+          });
+
+          await ctx.reply(
+            `❌ Xatolik:\n${err instanceof Error ? err.message : String(err)}`
+          );
+        
       }
+      return true;
+    }
 
       return false;
-    },
+  },
 
     normalizePhone(value: string) {
-      const digitsOnly = value.replace(/[^0-9]/g, "");
-      if (!digitsOnly) return null;
-      if (digitsOnly.length < TEXT_LIMITS.PHONE_MIN || digitsOnly.length > TEXT_LIMITS.PHONE_MAX) {
-        return null;
-      }
-      return value.trim();
-    },
+    const digitsOnly = value.replace(/[^0-9]/g, "");
+    if (!digitsOnly) return null;
+    if (digitsOnly.length < TEXT_LIMITS.PHONE_MIN || digitsOnly.length > TEXT_LIMITS.PHONE_MAX) {
+      return null;
+    }
+    return value.trim();
+  },
 
     async handleContact(ctx: Context, userId: string, contact: { phone_number?: string | null }) {
-      const session = await sessionStore.get(userId, "public");
-      if (!session || session.flowType !== "nomination" || session.currentStep !== "teacher_phone") return false;
+    const session = await sessionStore.get(userId, "public");
+    if (!session || session.flowType !== "nomination" || session.currentStep !== "teacher_phone") return false;
 
-      const data = { ...session.collectedData } as Record<string, unknown>;
-      const phone = contact.phone_number?.trim();
-      if (!phone) {
-        await ctx.reply(t("nomination.phone_invalid"));
-        return true;
-      }
-
-      const normalized = this.normalizePhone(phone);
-      if (!normalized) {
-        await ctx.reply(t("nomination.phone_invalid"));
-        return true;
-      }
-
-      data.teacherPhone = normalized;
-      await sessionStore.update(session.id, { collectedData: data });
-      await this.askRelationship(ctx, session.id, data);
+    const data = { ...session.collectedData } as Record<string, unknown>;
+    const phone = contact.phone_number?.trim();
+    if (!phone) {
+      await ctx.reply(t("nomination.phone_invalid"));
       return true;
-    },
-  };
+    }
+
+    const normalized = this.normalizePhone(phone);
+    if (!normalized) {
+      await ctx.reply(t("nomination.phone_invalid"));
+      return true;
+    }
+
+    data.teacherPhone = normalized;
+    await sessionStore.update(session.id, { collectedData: data });
+    await this.askRelationship(ctx, session.id, data);
+    return true;
+  },
+};
 }

@@ -1,25 +1,31 @@
 import { Bot } from "grammy";
+
 import type { Container } from "../../config/di-container";
+import type { Env } from "../../config/env";
+
 import { adminRoleGuard } from "./middleware/admin-role-guard.middleware";
 import { registerModerationQueue } from "./handlers/moderation-queue.handler";
 import { registerMergeQueue } from "./handlers/merge-queue.handler";
-import { logger } from "../../logging/logger";
 
-import type { Env } from "../../config/env";
+import { logger } from "../../logging/logger";
 
 export function buildAdminBot(
   botToken: string,
   container: Container,
   env: Env,
 ) {
+  console.log("🔥 BUILD ADMIN BOT");
+
   const bot = new Bot(botToken);
 
+  bot.init().then(() => {
+    console.log("ADMIN BOT ID:", bot.botInfo.id);
+  });
 
-console.log("ADMIN BOT TOKEN:", botToken);
+  bot.command("test", async (ctx) => {
+    await ctx.reply("TEST OK");
+  });
 
-bot.init().then(() => {
-  console.log("ADMIN BOT ID:", bot.botInfo.id);
-});
   const {
     userRepo,
     teacherRepo,
@@ -51,14 +57,14 @@ bot.init().then(() => {
 
   bot.use(adminRoleGuard(userRepo));
 
- const queue = registerModerationQueue(
-  listPendingRecommendations,
-  moderateRecommendation,
-  teacherRepo,
-  recommendationRepo,
-  mediaRepo,
-  env,
-);
+  const queue = registerModerationQueue(
+    listPendingRecommendations,
+    moderateRecommendation,
+    teacherRepo,
+    recommendationRepo,
+    mediaRepo,
+    env,
+  );
 
   const mergeQueue = registerMergeQueue(
     duplicateCandidateRepo,
@@ -75,7 +81,11 @@ bot.init().then(() => {
     );
   });
 
-  bot.command("queue", (ctx) => queue.showQueue(ctx));
+  bot.command("queue", async (ctx) => {
+    console.log("QUEUE COMMAND RECEIVED");
+    await ctx.reply("QUEUE COMMAND RECEIVED");
+    await queue.showQueue(ctx);
+  });
 
   bot.command("merge_queue", (ctx) =>
     mergeQueue.showQueue(ctx),
@@ -85,15 +95,12 @@ bot.init().then(() => {
     if (!ctx.from) return;
 
     const user = await userRepo.findByTelegramId(ctx.from.id);
-
     if (!user) return;
 
     const query = ctx.match?.toString().trim();
 
     if (!query) {
-      await ctx.reply(
-        "Foydalanish: /search Otabek Hakimov",
-      );
+      await ctx.reply("Foydalanish: /search Otabek Hakimov");
       return;
     }
 
@@ -108,40 +115,30 @@ bot.init().then(() => {
         return;
       }
 
-     const lines = results.map(
+      const lines = results.map(
         (r: any) =>
-          `👤 <b>${r.fullName}</b> — ${
-            r.school ?? "-"
-          } (${r.publishStatus})`,
+          `👤 <b>${r.fullName}</b> — ${r.school ?? "-"} (${r.publishStatus})`,
       );
 
       await ctx.reply(lines.join("\n"), {
         parse_mode: "HTML",
       });
     } catch (err) {
-      await ctx.reply(
-        `Xato: ${(err as Error).message}`,
-      );
+      await ctx.reply(`Xato: ${(err as Error).message}`);
     }
   });
 
   bot.callbackQuery(
     /^mod:(review|approve|reject):(.+)$/,
     async (ctx) => {
-      const [
-        ,
-        action,
-        recommendationId,
-      ] = ctx.match as unknown as [
-        string,
-        "review" | "approve" | "reject",
-        string,
-      ];
+      const [, action, recommendationId] =
+        ctx.match as unknown as [
+          string,
+          "review" | "approve" | "reject",
+          string,
+        ];
 
-      const user = await userRepo.findByTelegramId(
-        ctx.from.id,
-      );
-
+      const user = await userRepo.findByTelegramId(ctx.from.id);
       if (!user) return;
 
       (
@@ -161,20 +158,14 @@ bot.init().then(() => {
   bot.callbackQuery(
     /^merge:(confirm|dismiss):(.+)$/,
     async (ctx) => {
-      const [
-        ,
-        decision,
-        candidateId,
-      ] = ctx.match as unknown as [
-        string,
-        "confirm" | "dismiss",
-        string,
-      ];
+      const [, decision, candidateId] =
+        ctx.match as unknown as [
+          string,
+          "confirm" | "dismiss",
+          string,
+        ];
 
-      const user = await userRepo.findByTelegramId(
-        ctx.from.id,
-      );
-
+      const user = await userRepo.findByTelegramId(ctx.from.id);
       if (!user) return;
 
       (

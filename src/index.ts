@@ -22,40 +22,66 @@ export default {
         return await webhookCallback(bot, "cloudflare-mod")(request);
       }
 
-      if (url.pathname === "/webhook/admin") {
-        if (request.headers.get("x-telegram-bot-api-secret-token") !== env.ADMIN_BOT_WEBHOOK_SECRET) {
-          logger.warn("admin_webhook_auth_failed", { path: url.pathname });
-          return new Response("Unauthorized", { status: 401 });
-        }
-       const bot = buildAdminBot(
-  env.ADMIN_BOT_TOKEN,
-  container,
-  env,
+if (url.pathname === "/webhook/admin") {
+  console.log("🔥 ADMIN WEBHOOK HIT");
+
+  if (
+    request.headers.get("x-telegram-bot-api-secret-token") !==
+    env.ADMIN_BOT_WEBHOOK_SECRET
+  ) {
+    logger.warn("admin_webhook_auth_failed", {
+      path: url.pathname,
+    });
+
+    return new Response("Unauthorized", {
+      status: 401,
+    });
+  }
+
+  console.log("🔥 BUILDING ADMIN BOT");
+
+  const bot = buildAdminBot(
+    env.ADMIN_BOT_TOKEN,
+    container,
+    env,
+  );
+
+  console.log("🔥 ADMIN BOT BUILT");
+
+  logger.info("before_webhook_callback");
+
+  const response = await webhookCallback(
+    bot,
+    "cloudflare-mod",
+  )(request);
+
+  logger.info("after_webhook_callback", {
+    status: response.status,
+  });
+
+  console.log(
+    "🔥 WEBHOOK FINISHED",
+    response.status,
+  );
+
+  return response;
+}
+
+return new Response(
+  "Qahramon O'qituvchilar API — see /webhook/public and /webhook/admin",
+  {
+    status: 200,
+  },
 );
-        logger.info("before_webhook_callback");
-
-const response = await webhookCallback(bot, "cloudflare-mod")(request);
-
-logger.info("after_webhook_callback", {
-  status: response.status,
-});
-
-return response;
-      }
-
-      return new Response("Qahramon O'qituvchilar API — see /webhook/public and /webhook/admin", {
-        status: 200,
-      });
     } catch (err) {
-      // Last-resort catch (Stage 9): bot.catch() handles errors inside grammY's own
-      // processing, but this covers anything before/outside that (e.g. buildContainer
-      // failing due to a bad DATABASE_URL) so Telegram always gets a clean response
-      // instead of the Worker crashing with an unhandled exception.
       logger.error("worker_fetch_unhandled_error", {
         error: err instanceof Error ? err.message : String(err),
         path: url.pathname,
       });
-      return new Response("Internal error", { status: 500 });
+
+      return new Response("Internal error", {
+        status: 500,
+      });
     }
   },
 };
