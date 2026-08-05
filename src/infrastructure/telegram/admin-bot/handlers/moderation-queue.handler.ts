@@ -5,19 +5,28 @@ import type { TeacherRepositoryPort } from "../../../../application/ports/reposi
 import type { RecommendationRepositoryPort } from "../../../../application/ports/repositories/recommendation.repository.port";
 import type { MediaRepositoryPort } from "../../../../application/ports/repositories/media.repository.port";
 import type { Env } from "../../../config/env";
+
+/**
+ * Minimal shape of a recommendation needed to render a card.
+ * Both the queue listing and a by-id lookup satisfy this shape.
+ */
+type RecommendationCard = {
+  id: string;
+  teacherId: string;
+  relationship: string | null;
+  recommendationText: string | null;
+  recommenderName: string | null;
+  recommenderPhone: string | null;
+  additionalInfo: string | null;
+};
+
 function formatRecommendation(
   teacher: {
     fullName: string;
     school: string | null;
   },
   communityCount: number,
-  r: {
-    relationship: string | null;
-    recommendationText: string | null;
-    recommenderName: string | null;
-    recommenderPhone: string | null;
-    additionalInfo: string | null;
-  },
+  r: RecommendationCard,
 ) {
   return [
     `👤 <b>${teacher.fullName}</b>`,
@@ -51,132 +60,153 @@ export function registerModerationQueue(
   mediaRepo: MediaRepositoryPort,
   env: Env,
 ) {
+  /**
+   * Single source of truth for rendering a recommendation card:
+   * loads teacher + community count + media, sends R2 media with
+   * telegramFileId fallback, and attaches the caption/keyboard exactly
+   * once — regardless of whether it's called from the queue or a
+   * direct review-by-id lookup.
+   */
+  async function sendRecommendationCard(
+    ctx: Context,
+    rec: RecommendationCard,
+    kb: InlineKeyboard,
+    headerLines: string[] = [],
+  ) {
+    const [teacher, communityCount, mediaList] = await Promise.all([
+      teacherRepo.findById(rec.teacherId),
+      recommendationRepo.countIndependentByTeacherId(rec.teacherId),
+      mediaRepo.listByRecommendationIds([rec.id]),
+    ]);
+
+    const text = [
+      ...headerLines,
+      ...(headerLines.length ? [""] : []),
+      formatRecommendation(
+        teacher ?? { fullName: "Noma'lum", school: null },
+        communityCount,
+        rec,
+      ),
+    ].join("\n");
+
+    const r2Bucket = (env as { R2_BUCKET?: R2Bucket }).R2_BUCKET;
+    let sent = false;
+
+    for (const media of mediaList) {
+      try {
+        if (r2Bucket && media.objectKey) {
+          const object = await r2Bucket.get(media.objectKey);
+
+          if (object) {
+            const bytes = new Uint8Array(await object.arrayBuffer());
+            const filename =
+              media.objectKey.split("/").pop() ?? "media";
+
+            if (media.mediaType === "photo") {
+              await ctx.replyWithPhoto(
+                new InputFile(bytes, filename),
+                {
+                  caption: !sent ? text : undefined,
+                  parse_mode: "HTML",
+                  reply_markup: !sent ? kb : undefined,
+                },
+              );
+            } else if (media.mediaType === "video") {
+              await ctx.replyWithVideo(
+                new InputFile(bytes, filename),
+                {
+                  caption: !sent ? text : undefined,
+                  parse_mode: "HTML",
+                  reply_markup: !sent ? kb : undefined,
+                },
+              );
+            }
+
+            sent = true;
+            continue;
+          }
+        }
+
+        if (media.telegramFileId) {
+          if (media.mediaType === "photo") {
+            await ctx.replyWithPhoto(media.telegramFileId, {
+              caption: !sent ? text : undefined,
+              parse_mode: "HTML",
+              reply_markup: !sent ? kb : undefined,
+            });
+          } else if (media.mediaType === "video") {
+            await ctx.replyWithVideo(media.telegramFileId, {
+              caption: !sent ? text : undefined,
+              parse_mode: "HTML",
+              reply_markup: !sent ? kb : undefined,
+            });
+          }
+
+          sent = true;
+        }
+      } catch (err) {
+        console.error("Media send failed:", err);
+      }
+    }
+
+    if (!sent) {
+      await ctx.reply(text, {
+        parse_mode: "HTML",
+        reply_markup: kb,
+      });
+    }
+  }
+
   return {
-   async showQueue(ctx: Context) {
-      const { items, totalPending } =
-        await listPending.execute(1);
+    /**
+     * Loads the newest NEW recommendation and renders it with a
+     * "start review" keyboard. Never touched by the review flow anymore.
+     */
+    async showQueue(ctx: Context) {
+      const { items, totalPending } = await listPending.execute(1);
 
       if (items.length === 0) {
-        await ctx.reply(
-          "🗂 Navbat bo'sh. Yangi arizalar yo'q.",
-        );
+        await ctx.reply("🗂 Navbat bo'sh. Yangi arizalar yo'q.");
         return;
       }
 
       const rec = items[0]!;
+      const kb = new InlineKeyboard().text(
+        "👀 Ko'rib chiqish",
+        `mod:review:${rec.id}`,
+      );
 
-      const [teacher, communityCount, mediaList] =
-        await Promise.all([
-          
-          teacherRepo.findById(rec.teacherId),
-          recommendationRepo.countIndependentByTeacherId(
-            rec.teacherId,
-          ),
-          mediaRepo.listByRecommendationIds([rec.id]),
-        ]);
-
-
-        console.log(
-  "MEDIA COUNT:",
-  mediaList.length,
-  mediaList.map((m) => ({
-    type: m.mediaType,
-    objectKey: m.objectKey,
-    telegramFileId: m.telegramFileId,
-  })),
-);
-
-      const text = [
+      await sendRecommendationCard(ctx, rec, kb, [
         `Navbatda: ${totalPending} ta ariza`,
-        "",
-        formatRecommendation(
-          teacher ?? {
-            fullName: "Noma'lum",
-            school: null,
-          },
-          communityCount,
-          rec,
-        ),
-      ].join("\n");
+      ]);
+    },
 
-     const kb = new InlineKeyboard().text(
-  "👀 Ko'rib chiqish",
-  `mod:review:${rec.id}`,
-);
+    /**
+     * Loads a recommendation BY ID regardless of its current status
+     * (so moving it to under_review doesn't make it disappear), and
+     * renders it with the approve/reject keyboard.
+     */
+    async showReview(ctx: Context, recommendationId: string) {
+      const rec = (await recommendationRepo.findById(
+        recommendationId,
+      )) as RecommendationCard | null;
 
-     
-const r2Bucket = (env as { R2_BUCKET?: R2Bucket }).R2_BUCKET;
-let sent = false;
-
-for (const media of mediaList) {
-  try {
-    if (r2Bucket && media.objectKey) {
-      const object = await r2Bucket.get(media.objectKey);
-
-      if (object) {
-        const bytes = new Uint8Array(await object.arrayBuffer());
-        const filename = media.objectKey.split("/").pop() ?? "media";
-
-        if (media.mediaType === "photo") {
-          await ctx.replyWithPhoto(
-            new InputFile(bytes, filename),
-            {
-              caption: !sent ? text : undefined,
-              parse_mode: "HTML",
-              reply_markup: !sent ? kb : undefined,
-            },
-          );
-        } else if (media.mediaType === "video") {
-          await ctx.replyWithVideo(
-            new InputFile(bytes, filename),
-            {
-              caption: !sent ? text : undefined,
-              parse_mode: "HTML",
-              reply_markup: !sent ? kb : undefined,
-            },
-          );
-        }
-
-        sent = true;
-        continue;
-      }
-    }
-
-    if (media.telegramFileId) {
-      if (media.mediaType === "photo") {
-        await ctx.replyWithPhoto(media.telegramFileId, {
-          caption: !sent ? text : undefined,
-          parse_mode: "HTML",
-          reply_markup: !sent ? kb : undefined,
-        });
-      } else if (media.mediaType === "video") {
-        await ctx.replyWithVideo(media.telegramFileId, {
-          caption: !sent ? text : undefined,
-          parse_mode: "HTML",
-          reply_markup: !sent ? kb : undefined,
-        });
+      if (!rec) {
+        await ctx.reply("⚠️ Ariza topilmadi.");
+        return;
       }
 
-      sent = true;
-    }
+      const kb = new InlineKeyboard()
+        .text("✅ Tasdiqlash", `mod:approve:${rec.id}`)
+        .text("❌ Rad etish", `mod:reject:${rec.id}`);
 
-  } catch (err) {
-    console.error("Media send failed:", err);
-  }
-}
-if (!sent) {
-  await ctx.reply(text, {
-    parse_mode: "HTML",
-    reply_markup: kb,
-  });
-}
+      await sendRecommendationCard(ctx, rec, kb);
     },
 
     async handleAction(
       ctx: Context,
       action: "review" | "approve" | "reject",
       recommendationId: string,
-      env?: { R2_BUCKET?: R2Bucket },
     ) {
       const moderatorUserId =
         (ctx as unknown as {
@@ -190,68 +220,35 @@ if (!sent) {
       } as const;
 
       try {
-      await moderate.execute({
-  recommendationId,
-  moderatorUserId,
-  action: actionMap[action],
-});
+        await moderate.execute({
+          recommendationId,
+          moderatorUserId,
+          action: actionMap[action],
+        });
 
-if (action === "review") {
-  await ctx.answerCallbackQuery({
-    text: "Ko'rib chiqish ochilmoqda...",
-  });
+        if (action === "review") {
+          await ctx.answerCallbackQuery({
+            text: "Ko'rib chiqish ochildi",
+          });
 
- const rec = await recommendationRepo.findById(recommendationId);
+          // Do NOT call showQueue() here — the item just moved to
+          // under_review and would vanish from the "new" queue.
+          await this.showReview(ctx, recommendationId);
 
-if (!rec) {
-  await ctx.reply("❌ Ariza topilmadi");
-  return;
-}
+          return;
+        }
 
-const kb = new InlineKeyboard()
-  .text(
-    "✅ Tasdiqlash",
-    `mod:approve:${rec.id}`,
-  )
-  .text(
-    "❌ Rad etish",
-    `mod:reject:${rec.id}`,
-  );
-
-await ctx.reply(
-  [
-    "📋 Ariza batafsil:",
-    "",
-    `🆔 ID: ${rec.id}`,
-    `📌 Holat: ${rec.status}`,
-    "",
-    `📝 Tavsiya: ${rec.recommendationText ?? "-"}`,
-    "",
-    `👤 Tavsiya qiluvchi: ${rec.recommenderName ?? "-"}`,
-    `📞 Telefon: ${rec.recommenderPhone ?? "-"}`,
-  ].join("\n"),
-  {
-    reply_markup: kb,
-  },
-);
-
-return;
-
-
-}
-
-await ctx.answerCallbackQuery({
-  text:
-    action === "approve"
-      ? "Tasdiqlandi"
-      : "Rad etildi",
-});
-
-await this.showQueue(ctx);
-      } catch (err) {
         await ctx.answerCallbackQuery({
           text:
-            (err as Error).message,
+            action === "approve"
+              ? "Tasdiqlandi"
+              : "Rad etildi",
+        });
+
+        await this.showQueue(ctx);
+      } catch (err) {
+        await ctx.answerCallbackQuery({
+          text: (err as Error).message,
           show_alert: true,
         });
       }
