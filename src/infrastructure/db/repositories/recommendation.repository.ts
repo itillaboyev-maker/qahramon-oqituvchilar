@@ -1,4 +1,4 @@
-import { eq, asc, and, ne, count, sql } from "drizzle-orm";
+import { eq, asc, and, ne, count, sql, inArray } from "drizzle-orm";
 import type { Database } from "../client";
 import { recommendations } from "../schema";
 import type {
@@ -16,9 +16,9 @@ export class RecommendationRepository implements RecommendationRepositoryPort {
       .values({
         teacherId: input.teacherId,
         submittedByUserId: input.submittedByUserId ?? null,
-       
+
         status: "new",
-       
+
         recommenderName: input.recommenderName ?? null,
         recommenderPhone: input.teacherPhone ?? input.recommenderPhone ?? null,
         relationship: input.relationship ?? null,
@@ -64,6 +64,7 @@ export class RecommendationRepository implements RecommendationRepositoryPort {
       .where(eq(recommendations.status, status));
     return row?.value ?? 0;
   }
+
 
  async updateStatus(
   id: string,
@@ -113,6 +114,25 @@ export class RecommendationRepository implements RecommendationRepositoryPort {
       .where(and(eq(recommendations.teacherId, teacherId), ne(recommendations.status, "rejected")));
     return row?.value ?? 0;
   }
+
+  async countIndependentByTeacherIds(teacherIds: string[]): Promise<Record<string, number>> {
+    const result: Record<string, number> = {};
+    for (const id of teacherIds) result[id] = 0;
+    if (teacherIds.length === 0) return result;
+
+    const rows = await this.db
+      .select({ teacherId: recommendations.teacherId, value: count() })
+      .from(recommendations)
+      .where(
+        and(inArray(recommendations.teacherId, teacherIds), ne(recommendations.status, "rejected")),
+      )
+      .groupBy(recommendations.teacherId);
+
+    for (const row of rows) result[row.teacherId] = row.value;
+    return result;
+  }
+
+
 
   async reassignTeacher(fromTeacherId: string, toTeacherId: string): Promise<number> {
     const rows = await this.db

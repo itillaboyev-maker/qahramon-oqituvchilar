@@ -24,7 +24,10 @@ export interface ModerateRecommendationInput {
  * that stays a separate editorial decision (teacher.publishStatus), matching
  * "Qahramonni jamiyat tanlaydi, ekspertiza tasdiqlaydi": one recommendation being
  * approved bumps the teacher from draft -> review, signalling "ready for an editor look",
- * never straight to published.
+ * never straight to published. Publishing itself (review -> published) is a distinct
+ * business stage, owned entirely by PublishTeacherUseCase — this use case never sets
+ * publishStatus to "published" and never inspects the moderator's role beyond
+ * moderator-or-above; recommendation lifecycle and teacher lifecycle are kept separate.
  */
 export class ModerateRecommendationUseCase {
   constructor(
@@ -48,12 +51,11 @@ export class ModerateRecommendationUseCase {
     const nextStatus = this.resolveNextStatus(current.status, input.action);
 
     const updated = await this.recommendationRepo.updateStatus(
-  input.recommendationId,
-  nextStatus,
-  input.moderatorUserId,
-  input.notes ?? null,
-);
-
+      input.recommendationId,
+      nextStatus,
+      input.moderatorUserId,
+      input.notes ?? null,
+    );
 
     await this.auditLogRepo.record({
       actorUserId: input.moderatorUserId,
@@ -67,14 +69,14 @@ export class ModerateRecommendationUseCase {
     if (nextStatus === "approved") {
       const teacher = await this.teacherRepo.findById(updated.teacherId);
       if (teacher && teacher.publishStatus === "draft") {
-        await this.teacherRepo.updatePublishStatus(teacher.id, "review");
+        await this.teacherRepo.updatePublishStatus(teacher.id, "ready_for_publish");
         await this.auditLogRepo.record({
           actorUserId: input.moderatorUserId,
           action: "teacher.publish_status_advanced",
           entityType: "teacher",
           entityId: teacher.id,
           beforeState: { publishStatus: "draft" },
-          afterState: { publishStatus: "review" },
+          afterState: { publishStatus: "ready_for_publish" },
         });
       }
     }

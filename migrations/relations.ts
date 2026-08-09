@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm/relations";
-import { regions, districts, teachers, recommendations, users, media, auditLogs, botSessions, generatedContent, duplicateCandidates } from "./schema";
+import { regions, districts, teachers, recommendations, users, auditLogs, botSessions, generatedContent, duplicateCandidates, media } from "./schema";
 
 export const districtsRelations = relations(districts, ({one, many}) => ({
 	region: one(regions, {
@@ -66,22 +66,11 @@ export const usersRelations = relations(users, ({many}) => ({
 	recommendations_moderatedBy: many(recommendations, {
 		relationName: "recommendations_moderatedBy_users_id"
 	}),
-	media: many(media),
 	auditLogs: many(auditLogs),
 	botSessions: many(botSessions),
 	generatedContents: many(generatedContent),
 	duplicateCandidates: many(duplicateCandidates),
-}));
-
-export const mediaRelations = relations(media, ({one}) => ({
-	recommendation: one(recommendations, {
-		fields: [media.recommendationId],
-		references: [recommendations.id]
-	}),
-	user: one(users, {
-		fields: [media.uploadedBy],
-		references: [users.id]
-	}),
+	media: many(media),
 }));
 
 export const auditLogsRelations = relations(auditLogs, ({one}) => ({
@@ -123,5 +112,16 @@ export const duplicateCandidatesRelations = relations(duplicateCandidates, ({one
 	user: one(users, {
 		fields: [duplicateCandidates.reviewedBy],
 		references: [users.id]
+	}),
+}));
+
+export const mediaRelations = relations(media, ({one}) => ({
+	user: one(users, {
+		fields: [media.uploadedBy],
+		references: [users.id]
+	}),
+	recommendation: one(recommendations, {
+		fields: [media.recommendationId],
+		references: [recommendations.id]
 	}),
 }));

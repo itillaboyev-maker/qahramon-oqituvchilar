@@ -1,10 +1,11 @@
-import { eq, and, or, ilike, sql } from "drizzle-orm";
+import { eq, and, or, ilike, sql, asc, count } from "drizzle-orm";
 import type { Database } from "../client";
-import { teachers } from "../schema";
+import { teachers, regions, districts } from "../schema";
 import type {
   TeacherRepositoryPort,
   CandidatePrefilterInput,
   TeacherSearchFilters,
+  TeacherPublishQueueItem,
 } from "../../../application/ports/repositories/teacher.repository.port";
 import type { Teacher, NewTeacherInput } from "../../../domain/entities/teacher.entity";
 import { IDENTITY_RESOLUTION } from "../../../shared/constants/identity-resolution.constants";
@@ -20,10 +21,6 @@ export class TeacherRepository implements TeacherRepositoryPort {
   async findCandidatesByNameSimilarity(input: CandidatePrefilterInput): Promise<Teacher[]> {
     const { CANDIDATE_PREFILTER_LIMIT, CANDIDATE_PREFILTER_MIN_TRIGRAM_SIMILARITY } = IDENTITY_RESOLUTION;
 
-    // Deliberately using similarity() directly with our own explicit threshold rather
-    // than pg_trgm's `%` operator (which depends on a session-level set_limit() GUC) —
-    // Supabase's pooled connection can hand different queries to different backend
-    // connections under a transaction-mode pooler, so session state isn't reliable here.
     const rows = await this.db
       .select()
       .from(teachers)
@@ -93,5 +90,64 @@ export class TeacherRepository implements TeacherRepositoryPort {
       .limit(limit);
 
     return rows as Teacher[];
+  }
+
+  private toPublishQueueItem(row: {
+    teacher: unknown;
+    regionName: string | null;
+    districtName: string | null;
+  }): TeacherPublishQueueItem {
+    return {
+      ...(row.teacher as Teacher),
+      regionName: row.regionName ?? null,
+      districtName: row.districtName ?? null,
+    };
+  }
+
+  async listPublishQueue(
+    status: Teacher["publishStatus"],
+    limit: number,
+    offset: number,
+  ): Promise<TeacherPublishQueueItem[]> {
+    const rows = await this.db
+      .select({
+        teacher: teachers,
+        regionName: regions.nameUzLatn,
+        districtName: districts.nameUzLatn,
+      })
+      .from(teachers)
+      .leftJoin(regions, eq(teachers.regionId, regions.id))
+      .leftJoin(districts, eq(teachers.districtId, districts.id))
+      .where(eq(teachers.publishStatus, status))
+      .orderBy(asc(teachers.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    return rows.map((row) => this.toPublishQueueItem(row));
+  }
+
+  async countByPublishStatus(status: Teacher["publishStatus"]): Promise<number> {
+    const [row] = await this.db
+      .select({ value: count() })
+      .from(teachers)
+      .where(eq(teachers.publishStatus, status));
+    return row?.value ?? 0;
+  }
+
+  async findPublishQueueDetailById(id: string): Promise<TeacherPublishQueueItem | null> {
+    const [row] = await this.db
+      .select({
+        teacher: teachers,
+        regionName: regions.nameUzLatn,
+        districtName: districts.nameUzLatn,
+      })
+      .from(teachers)
+      .leftJoin(regions, eq(teachers.regionId, regions.id))
+      .leftJoin(districts, eq(teachers.districtId, districts.id))
+      .where(eq(teachers.id, id))
+      .limit(1);
+
+    if (!row) return null;
+    return this.toPublishQueueItem(row);
   }
 }

@@ -38,6 +38,14 @@ export interface RecommendationRepositoryPort {
    * or used as a ranking/voting mechanism (see DECISIONS.md D002).
    */
   countIndependentByTeacherId(teacherId: string): Promise<number>;
+  /**
+ * Batch version of countIndependentByTeacherId for list screens (e.g. the publish
+ * queue) that render N teachers per page — one grouped query instead of N queries.
+ * Returns 0 for any teacherId with no independent recommendations.
+ */
+countIndependentByTeacherIds(
+  teacherIds: string[],
+): Promise<Record<string, number>>;
   /** Bulk-reassigns every recommendation from one teacher to another (merge workflow, business rule F). Returns rows affected. */
   reassignTeacher(fromTeacherId: string, toTeacherId: string): Promise<number>;
   /** Stage 10 rate limiting: how many recommendations this user submitted in the last N minutes. */

@@ -43,4 +43,10 @@ export class UserRepository implements UserRepositoryPort {
     if (!row) return false;
     return row.role === "moderator" || row.role === "editor" || row.role === "admin";
   }
+
+  async isEditorOrAbove(userId: string): Promise<boolean> {
+    const [row] = await this.db.select({ role: users.role }).from(users).where(eq(users.id, userId)).limit(1);
+    if (!row) return false;
+    return row.role === "editor" || row.role === "admin";
+  }
 }

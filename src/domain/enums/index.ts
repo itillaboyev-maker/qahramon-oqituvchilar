@@ -1,6 +1,6 @@
 export type UserRole = "user" | "moderator" | "editor" | "admin";
 export type Locale = "uz-latn" | "uz-cyrl" | "ru" | "en";
-export type PublishStatus = "draft" | "review" | "published" | "archived";
+export type PublishStatus = "draft" | "ready_for_publish" | "published" | "archived";
 export type Relationship =
   | "student"
   | "former_student"

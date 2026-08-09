@@ -6,4 +6,6 @@ export interface Env {
   ADMIN_BOT_WEBHOOK_SECRET: string;
   REQUIRED_CHANNEL_ID: string;
   ENVIRONMENT: string;
+  R2_BUCKET_NAME?: string;
+  R2_BUCKET?: R2Bucket;
 }

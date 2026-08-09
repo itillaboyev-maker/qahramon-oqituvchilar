@@ -6,7 +6,7 @@ export const localeEnum = pgEnum("locale", ["uz-latn", "uz-cyrl", "ru", "en"]);
 
 export const publishStatusEnum = pgEnum("publish_status", [
   "draft",
-  "review",
+  "ready_for_publish",
   "published",
   "archived",
 ]);

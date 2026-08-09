@@ -41,7 +41,14 @@
       "idx": 5,
       "version": "7",
       "when": 1784188423000,
-      "tag": "0005_final_tashkent_cleanup",
+      "tag": "0005_fix_tashkent_district_mapping",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786120472379,
+      "tag": "0006_dazzling_lady_ursula",
       "breakpoints": true
     }
   ]

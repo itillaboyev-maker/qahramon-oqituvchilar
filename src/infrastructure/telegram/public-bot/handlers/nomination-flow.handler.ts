@@ -201,37 +201,41 @@ export function registerNominationFlow(
         await ctx.reply(t("nomination.media_duplicate"), { reply_markup: kb });
         return true;
       }
-      console.log("R2 SERVICE EXISTS:", !!r2StorageService);
-      console.log("BOT TOKEN EXISTS:", !!botToken);
+      let uploadResult: {
+        objectKey?: string;
+        bucketName?: string;
+        mimeType?: string;
+        sizeBytes?: number;
+        checksumSha256?: string;
+      } | null = null;
 
-      if (!r2StorageService || !botToken) {
-        await ctx.reply("Media upload is unavailable. Iltimos, keyinroq urinib ko'ring.");
-        return true;
+      if (r2StorageService && botToken) {
+        try {
+          uploadResult = await r2StorageService.uploadFromTelegram({
+            botToken,
+            fileId,
+            recommendationId: null,
+            userId,
+          });
+        } catch (err) {
+          logger.warn("media_r2_upload_failed_falling_back_to_telegram", {
+            error: err instanceof Error ? err.message : String(err),
+            userId,
+            fileId,
+          });
+        }
       }
 
-      try {
-        const uploadResult = await r2StorageService.uploadFromTelegram({
-          botToken,
-          fileId,
-          recommendationId: null,
-          userId,
-        });
-
-        existing.push({
-          mediaType,
-          telegramFileId: fileId,
-          telegramFileUniqueId: fileUniqueId,
-          objectKey: uploadResult.objectKey,
-          bucketName: uploadResult.bucketName,
-          mimeType: uploadResult.mimeType,
-          sizeBytes: uploadResult.sizeBytes,
-          checksumSha256: uploadResult.checksumSha256,
-        });
-      } catch (err) {
-        logger.error("media_upload_failed", { error: (err as Error).message, userId, fileId });
-        await ctx.reply("Media upload failed. Iltimos, qayta urinib ko'ring.");
-        return true;
-      }
+      existing.push({
+        mediaType,
+        telegramFileId: fileId,
+        telegramFileUniqueId: fileUniqueId,
+        objectKey: uploadResult?.objectKey ?? null,
+        bucketName: uploadResult?.bucketName ?? null,
+        mimeType: uploadResult?.mimeType ?? null,
+        sizeBytes: uploadResult?.sizeBytes ?? null,
+        checksumSha256: uploadResult?.checksumSha256 ?? null,
+      });
 
       data.media = existing;
 

@@ -1,4 +1,4 @@
-import { inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import type { Database } from "../client";
 import { media } from "../schema";
 import type {
@@ -41,7 +41,11 @@ export class MediaRepository implements MediaRepositoryPort {
 
   async listByRecommendationIds(recommendationIds: string[]): Promise<Media[]> {
     if (recommendationIds.length === 0) return [];
-    const rows = await this.db.select().from(media).where(inArray(media.recommendationId, recommendationIds));
+    const rows = await this.db.select().from(media).where(
+      recommendationIds.length === 1
+        ? eq(media.recommendationId, recommendationIds[0]!)
+        : inArray(media.recommendationId, recommendationIds),
+    );
     return rows as Media[];
   }
 }

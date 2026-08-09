@@ -20,6 +20,12 @@ import { ModerateRecommendationUseCase } from "../../application/use-cases/recom
 import { SearchTeachersUseCase } from "../../application/use-cases/teacher/search-teachers.use-case";
 import { MergeTeachersUseCase } from "../../application/use-cases/teacher/merge-teachers.use-case";
 
+import { PublishTeacherUseCase } from "../../application/use-cases/teacher/publish-teacher.use-case";
+import { ListPublishQueueUseCase } from "../../application/use-cases/teacher/list-publish-queue.use-case";
+import { GetTeacherPublishDetailUseCase } from "../../application/use-cases/teacher/get-teacher-publish-detail.use-case";
+import { ListPublishedTeachersUseCase } from "../../application/use-cases/teacher/list-published-teachers.use-case";
+
+
 export interface Container {
   db: Database;
   sessionStore: PostgresSessionStore;
@@ -40,7 +46,13 @@ export interface Container {
     moderateRecommendation: ModerateRecommendationUseCase;
     searchTeachers: SearchTeachersUseCase;
     mergeTeachers: MergeTeachersUseCase;
+
+    publishTeacher: PublishTeacherUseCase;
+    listPublishQueue: ListPublishQueueUseCase;
+    getTeacherPublishDetail: GetTeacherPublishDetailUseCase;
+    listPublishedTeachers: ListPublishedTeachersUseCase;
   };
+
   telegramClients: {
     publicTelegramClient: any;
   };
@@ -92,8 +104,8 @@ console.log("=======================");
   const registerUser = new RegisterUserUseCase(userRepo);
   const listPendingRecommendations = new ListPendingRecommendationsUseCase(recommendationRepo);
 
-  
-  
+
+
  const searchTeachers = new SearchTeachersUseCase(
   teacherRepo,
   userRepo,
@@ -112,6 +124,26 @@ const mergeTeachers = new MergeTeachersUseCase(
   userRepo,
   auditLogRepo,
 );
+const publishTeacher = new PublishTeacherUseCase(
+  userRepo,
+  teacherRepo,
+  auditLogRepo,
+);
+
+const listPublishQueue = new ListPublishQueueUseCase(
+  userRepo,
+  teacherRepo,
+  recommendationRepo,
+);
+const getTeacherPublishDetail = new GetTeacherPublishDetailUseCase(
+  userRepo,
+  teacherRepo,
+  recommendationRepo,
+  mediaRepo,
+);
+
+const listPublishedTeachers = new ListPublishedTeachersUseCase(userRepo, teacherRepo);
+
   const publicTelegramClient = {
     async isChannelMember(telegramUserId: number, channelId: string): Promise<boolean> {
   const res = await fetch(
@@ -158,6 +190,11 @@ const mergeTeachers = new MergeTeachersUseCase(
       moderateRecommendation,
       searchTeachers,
       mergeTeachers,
+       publishTeacher,
+     listPublishQueue,
+      getTeacherPublishDetail,
+      listPublishedTeachers,
+
     },
     telegramClients: {
       publicTelegramClient,

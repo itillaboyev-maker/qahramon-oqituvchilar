@@ -183,39 +183,6 @@ export const users = pgTable("users", {
 	}
 });
 
-export const media = pgTable("media", {
-	id: uuid().defaultRandom().primaryKey().notNull(),
-	recommendationId: uuid("recommendation_id").notNull(),
-	mediaType: mediaType("media_type").notNull(),
-	storageProvider: storageProvider("storage_provider").default('telegram').notNull(),
-	telegramFileId: varchar("telegram_file_id", { length: 255 }),
-	telegramFileUniqueId: varchar("telegram_file_unique_id", { length: 255 }),
-	r2Key: varchar("r2_key", { length: 512 }),
-	isPublic: boolean("is_public").default(false).notNull(),
-	uploadedBy: uuid("uploaded_by"),
-	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-}, (table) => {
-	return {
-		recommendationIdx: index("media_recommendation_idx").using("btree", table.recommendationId.asc().nullsLast().op("uuid_ops")),
-		mediaRecommendationIdRecommendationsIdFk: foreignKey({
-			columns: [table.recommendationId],
-			foreignColumns: [recommendations.id],
-			name: "media_recommendation_id_recommendations_id_fk"
-		}),
-		mediaUploadedByUsersIdFk: foreignKey({
-			columns: [table.uploadedBy],
-			foreignColumns: [users.id],
-			name: "media_uploaded_by_users_id_fk"
-		}),
-		mediaIdNotNull: check("media_id_not_null", sql`NOT NULL id`),
-		mediaRecommendationIdNotNull: check("media_recommendation_id_not_null", sql`NOT NULL recommendation_id`),
-		mediaMediaTypeNotNull: check("media_media_type_not_null", sql`NOT NULL media_type`),
-		mediaStorageProviderNotNull: check("media_storage_provider_not_null", sql`NOT NULL storage_provider`),
-		mediaIsPublicNotNull: check("media_is_public_not_null", sql`NOT NULL is_public`),
-		mediaCreatedAtNotNull: check("media_created_at_not_null", sql`NOT NULL created_at`),
-	}
-});
-
 export const auditLogs = pgTable("audit_logs", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	actorUserId: uuid("actor_user_id"),
@@ -328,5 +295,44 @@ export const duplicateCandidates = pgTable("duplicate_candidates", {
 		duplicateCandidatesTeacherIdBNotNull: check("duplicate_candidates_teacher_id_b_not_null", sql`NOT NULL teacher_id_b`),
 		duplicateCandidatesStatusNotNull: check("duplicate_candidates_status_not_null", sql`NOT NULL status`),
 		duplicateCandidatesCreatedAtNotNull: check("duplicate_candidates_created_at_not_null", sql`NOT NULL created_at`),
+	}
+});
+
+export const media = pgTable("media", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	recommendationId: uuid("recommendation_id").notNull(),
+	mediaType: mediaType("media_type").notNull(),
+	storageProvider: storageProvider("storage_provider").default('r2').notNull(),
+	telegramFileId: varchar("telegram_file_id", { length: 255 }),
+	telegramFileUniqueId: varchar("telegram_file_unique_id", { length: 255 }),
+	r2Key: varchar("r2_key", { length: 512 }),
+	isPublic: boolean("is_public").default(false).notNull(),
+	uploadedBy: uuid("uploaded_by"),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	objectKey: varchar("object_key", { length: 512 }),
+	bucketName: varchar("bucket_name", { length: 63 }),
+	mimeType: varchar("mime_type", { length: 128 }),
+	sizeBytes: integer("size_bytes"),
+	checksumSha256: varchar("checksum_sha256", { length: 64 }),
+}, (table) => {
+	return {
+		checksumIdx: index("media_checksum_idx").using("btree", table.checksumSha256.asc().nullsLast().op("text_ops")),
+		recommendationIdx: index("media_recommendation_idx").using("btree", table.recommendationId.asc().nullsLast().op("uuid_ops")),
+		mediaUploadedByUsersIdFk: foreignKey({
+			columns: [table.uploadedBy],
+			foreignColumns: [users.id],
+			name: "media_uploaded_by_users_id_fk"
+		}),
+		mediaRecommendationIdRecommendationsIdFk: foreignKey({
+			columns: [table.recommendationId],
+			foreignColumns: [recommendations.id],
+			name: "media_recommendation_id_recommendations_id_fk"
+		}).onDelete("cascade"),
+		mediaIdNotNull: check("media_id_not_null", sql`NOT NULL id`),
+		mediaRecommendationIdNotNull: check("media_recommendation_id_not_null", sql`NOT NULL recommendation_id`),
+		mediaMediaTypeNotNull: check("media_media_type_not_null", sql`NOT NULL media_type`),
+		mediaStorageProviderNotNull: check("media_storage_provider_not_null", sql`NOT NULL storage_provider`),
+		mediaIsPublicNotNull: check("media_is_public_not_null", sql`NOT NULL is_public`),
+		mediaCreatedAtNotNull: check("media_created_at_not_null", sql`NOT NULL created_at`),
 	}
 });

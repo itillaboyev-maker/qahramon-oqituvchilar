@@ -1,4 +1,5 @@
 import { Bot } from "grammy";
+import type { Context } from "grammy";
 
 import type { Container } from "../../config/di-container";
 import type { Env } from "../../config/env";
@@ -6,6 +7,9 @@ import type { Env } from "../../config/env";
 import { adminRoleGuard } from "./middleware/admin-role-guard.middleware";
 import { registerModerationQueue } from "./handlers/moderation-queue.handler";
 import { registerMergeQueue } from "./handlers/merge-queue.handler";
+import { registerPublishedTeachers } from "./handlers/published-teachers.handler";
+
+import { registerPublishQueue } from "./handlers/publish-queue.handler";
 
 import { logger } from "../../logging/logger";
 
@@ -39,7 +43,18 @@ export function buildAdminBot(
     moderateRecommendation,
     mergeTeachers,
     searchTeachers,
+    publishTeacher,
+    listPublishQueue,
+    getTeacherPublishDetail,
+    listPublishedTeachers,
   } = container.useCases;
+
+  const publishedTeachers = registerPublishedTeachers(
+    listPublishedTeachers,
+    getTeacherPublishDetail,
+    container.repos.mediaRepo,
+    env,
+  );
 
   bot.catch((err) => {
     logger.error("admin_bot_unhandled_error", {
@@ -71,15 +86,37 @@ export function buildAdminBot(
     teacherRepo,
     mergeTeachers,
   );
+  const publishQueue = registerPublishQueue(
+    listPublishQueue,
+    getTeacherPublishDetail,
+    publishTeacher,
+  );
+
 
   bot.command("start", async (ctx) => {
     await ctx.reply(
       "Moderator paneli.\n\n" +
         "/queue — tavsiyalar navbati\n" +
         "/merge_queue — ehtimoliy dublikatlar navbati\n" +
+        "/publish_queue — nashrga tayyor profillar navbati\n" +
+        "/teachers — nashrdagi ustozlar katalogi\n" +
         "/search <matn> — ustozlarni qidirish",
     );
   });
+
+  async function showPublishedTeachers(ctx: Context) {
+    if (!ctx.from) return;
+
+    const user = await userRepo.findByTelegramId(ctx.from.id);
+    if (!user) return;
+
+    (ctx as unknown as { moderatorUserId: string }).moderatorUserId = user.id;
+
+    await publishedTeachers.showList(ctx, 0);
+  }
+
+  bot.command("teachers", showPublishedTeachers);
+  bot.command("published_teachers", showPublishedTeachers);
 
   bot.command("queue", async (ctx) => {
     console.log("QUEUE COMMAND RECEIVED");
@@ -90,6 +127,17 @@ export function buildAdminBot(
   bot.command("merge_queue", (ctx) =>
     mergeQueue.showQueue(ctx),
   );
+
+  bot.command("publish_queue", async (ctx) => {
+    if (!ctx.from) return;
+
+    const user = await userRepo.findByTelegramId(ctx.from.id);
+    if (!user) return;
+
+    (ctx as unknown as { moderatorUserId: string }).moderatorUserId = user.id;
+
+    await publishQueue.showQueue(ctx, 0);
+  });
 
   bot.command("search", async (ctx) => {
     if (!ctx.from) return;
@@ -181,6 +229,69 @@ export function buildAdminBot(
       );
     },
   );
+
+  bot.callbackQuery(/^publish:list:(\d+)$/, async (ctx) => {
+    const [, pageStr] = ctx.match as unknown as [string, string];
+
+    const user = await userRepo.findByTelegramId(ctx.from.id);
+    if (!user) return;
+
+    (ctx as unknown as { moderatorUserId: string }).moderatorUserId = user.id;
+
+    await publishQueue.showQueue(ctx, Number(pageStr) || 0);
+  });
+
+  bot.callbackQuery(/^publish:view:(.+):(\d+)$/, async (ctx) => {
+    const [, teacherId, pageStr] = ctx.match as unknown as [string, string, string];
+
+    const user = await userRepo.findByTelegramId(ctx.from.id);
+    if (!user) return;
+
+    (ctx as unknown as { moderatorUserId: string }).moderatorUserId = user.id;
+
+    await publishQueue.showDetail(ctx, teacherId, Number(pageStr) || 0);
+  });
+
+  bot.callbackQuery("publish:noop", async (ctx) => {
+    await ctx.answerCallbackQuery();
+  });
+
+  bot.callbackQuery(/^publish:confirm:(.+)$/, async (ctx) => {
+    const [, teacherId] = ctx.match as unknown as [string, string];
+
+    const user = await userRepo.findByTelegramId(ctx.from.id);
+    if (!user) return;
+
+    (ctx as unknown as { moderatorUserId: string }).moderatorUserId = user.id;
+
+    await publishQueue.handlePublish(ctx, teacherId);
+  });
+
+  bot.callbackQuery(/^teachers:list:(\d+)$/, async (ctx) => {
+    const [, pageStr] = ctx.match as unknown as [string, string];
+
+    const user = await userRepo.findByTelegramId(ctx.from.id);
+    if (!user) return;
+
+    (ctx as unknown as { moderatorUserId: string }).moderatorUserId = user.id;
+
+    await publishedTeachers.showList(ctx, Number(pageStr) || 0);
+  });
+
+  bot.callbackQuery(/^teachers:view:(.+):(\d+)$/, async (ctx) => {
+    const [, teacherId, pageStr] = ctx.match as unknown as [string, string, string];
+
+    const user = await userRepo.findByTelegramId(ctx.from.id);
+    if (!user) return;
+
+    (ctx as unknown as { moderatorUserId: string }).moderatorUserId = user.id;
+
+    await publishedTeachers.showDetail(ctx, teacherId, Number(pageStr) || 0);
+  });
+
+  bot.callbackQuery("teachers:noop", async (ctx) => {
+    await ctx.answerCallbackQuery();
+  });
 
   return bot;
 }
