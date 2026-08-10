@@ -1,13 +1,15 @@
-import { InlineKeyboard, type Context } from "grammy";
+import { InlineKeyboard, InputFile, type Context } from "grammy";
 import type { ListPublishQueueUseCase } from "../../../../application/use-cases/teacher/list-publish-queue.use-case";
 import type { GetTeacherPublishDetailUseCase } from "../../../../application/use-cases/teacher/get-teacher-publish-detail.use-case";
 import type { PublishTeacherUseCase } from "../../../../application/use-cases/teacher/publish-teacher.use-case";
+import type { Env } from "../../../config/env";
 import { logger } from "../../../logging/logger";
 
 export function registerPublishQueue(
   listPublishQueue: ListPublishQueueUseCase,
   getTeacherPublishDetail: GetTeacherPublishDetailUseCase,
   publishTeacher: PublishTeacherUseCase,
+  env: Env,
 ) {
   async function safeReply(
     ctx: Context,
@@ -25,6 +27,58 @@ export function registerPublishQueue(
 
   function moderatorUserIdOf(ctx: Context): string {
     return (ctx as unknown as { moderatorUserId: string }).moderatorUserId;
+  }
+
+  async function sendRecommendationMedia(
+    ctx: Context,
+    media: Array<{
+      id: string;
+      mediaType: string;
+      objectKey?: string | null | undefined;
+    }>,
+  ) {
+    const r2Bucket = (env as { R2_BUCKET?: R2Bucket }).R2_BUCKET;
+
+    for (const item of media) {
+      if (!item.objectKey) {
+        logger.warn("publish_queue.media_missing_object_key", {
+          mediaId: item.id,
+        });
+        continue;
+      }
+
+      if (!r2Bucket) {
+        logger.warn("publish_queue.media_r2_bucket_unavailable", {
+          mediaId: item.id,
+        });
+        continue;
+      }
+
+      try {
+        const object = await r2Bucket.get(item.objectKey);
+        if (!object) {
+          logger.warn("publish_queue.media_r2_object_not_found", {
+            mediaId: item.id,
+            objectKey: item.objectKey,
+          });
+          continue;
+        }
+
+        const bytes = new Uint8Array(await object.arrayBuffer());
+        const filename = item.objectKey.split("/").pop() ?? "media";
+
+        if (item.mediaType === "photo") {
+          await ctx.replyWithPhoto(new InputFile(bytes, filename));
+        } else if (item.mediaType === "video") {
+          await ctx.replyWithVideo(new InputFile(bytes, filename));
+        }
+      } catch (err) {
+        logger.error("publish_queue.media_send_failed", {
+          mediaId: item.id,
+          err: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
   }
 
   return {
@@ -77,6 +131,7 @@ export function registerPublishQueue(
       await safeReply(ctx, lines.join("\n"), { reply_markup: kb });
     },
 
+
     async showDetail(ctx: Context, teacherId: string, fromPage: number) {
       const moderatorUserId = moderatorUserIdOf(ctx);
 
@@ -123,8 +178,25 @@ export function registerPublishQueue(
       const kb = new InlineKeyboard()
         .text("⬅️ Back", `publish:list:${fromPage}`)
         .text("📢 Publish", `publish:confirm:${teacher.id}`);
-
+logger.info("publish_queue.media_debug", {
+  teacherId: teacher.id,
+  recommendations: detail.recommendations.map((r) => ({
+  
+    mediaCount: r.media.length,
+    media: r.media.map((m) => ({
+      id: m.id,
+      mediaType: m.mediaType,
+      objectKey: m.objectKey ?? null,
+    })),
+  })),
+});
       await safeReply(ctx, lines.join("\n"), { reply_markup: kb });
+
+      for (const recommendation of detail.recommendations) {
+        if (recommendation.media.length > 0) {
+          await sendRecommendationMedia(ctx, recommendation.media);
+        }
+      }
     },
 
     async handlePublish(ctx: Context, teacherId: string) {

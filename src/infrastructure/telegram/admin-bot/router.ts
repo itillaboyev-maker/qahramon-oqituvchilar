@@ -18,7 +18,7 @@ export function buildAdminBot(
   container: Container,
   env: Env,
 ) {
-  console.log("🔥 BUILD ADMIN BOT");
+  console.log("рџ”Ґ BUILD ADMIN BOT");
 
   const bot = new Bot(botToken);
 
@@ -90,17 +90,18 @@ export function buildAdminBot(
     listPublishQueue,
     getTeacherPublishDetail,
     publishTeacher,
+    env,
   );
 
 
   bot.command("start", async (ctx) => {
     await ctx.reply(
       "Moderator paneli.\n\n" +
-        "/queue — tavsiyalar navbati\n" +
-        "/merge_queue — ehtimoliy dublikatlar navbati\n" +
-        "/publish_queue — nashrga tayyor profillar navbati\n" +
-        "/teachers — nashrdagi ustozlar katalogi\n" +
-        "/search <matn> — ustozlarni qidirish",
+        "/queue вЂ” tavsiyalar navbati\n" +
+        "/merge_queue вЂ” ehtimoliy dublikatlar navbati\n" +
+        "/publish_queue вЂ” nashrga tayyor profillar navbati\n" +
+        "/teachers вЂ” nashrdagi ustozlar katalogi\n" +
+        "/search <matn> вЂ” ustozlarni qidirish",
     );
   });
 
@@ -165,7 +166,7 @@ export function buildAdminBot(
 
       const lines = results.map(
         (r: any) =>
-          `👤 <b>${r.fullName}</b> — ${r.school ?? "-"} (${r.publishStatus})`,
+          `рџ‘¤ <b>${r.fullName}</b> вЂ” ${r.school ?? "-"} (${r.publishStatus})`,
       );
 
       await ctx.reply(lines.join("\n"), {
@@ -286,8 +287,7 @@ export function buildAdminBot(
 
     (ctx as unknown as { moderatorUserId: string }).moderatorUserId = user.id;
 
-    await publishedTeachers.showDetail(ctx, teacherId, Number(pageStr) || 0);
-  });
+    await publishedTeachers.showDetail(ctx, teacherId, Number(pageStr) || 0);  });
 
   bot.callbackQuery("teachers:noop", async (ctx) => {
     await ctx.answerCallbackQuery();

@@ -3,6 +3,7 @@ import type { RecommendationRepositoryPort } from "../../ports/repositories/reco
 import type { MediaRepositoryPort } from "../../ports/repositories/media.repository.port";
 import type { UserRepositoryPort } from "../../ports/repositories/user.repository.port";
 import type { Recommendation } from "../../../domain/entities/recommendation.entity";
+import type { Media } from "../../../domain/entities/media.entity";
 import type { MediaType } from "../../../domain/enums";
 import { UnauthorizedActionError } from "../../../domain/errors/domain-errors";
 
@@ -15,6 +16,7 @@ export interface PublicRecommendationPreview {
 export interface RecommendationWithMediaPreview {
   recommendation: PublicRecommendationPreview;
   mediaSummary: string;
+  media: Media[];
 }
 
 export interface TeacherPublishDetail {
@@ -88,8 +90,13 @@ export class GetTeacherPublishDetailUseCase {
           recommendationText: recommendation.recommendationText,
         },
         mediaSummary: summarizeMedia(
-          mediaCountsByRecommendation.get(recommendation.id) ?? { photo: 0, video: 0, document: 0 },
-        ),
+  mediaCountsByRecommendation.get(recommendation.id) ?? {
+    photo: 0,
+    video: 0,
+    document: 0,
+  },
+),
+media: media.filter((item) => item.recommendationId === recommendation.id),
       }),
     );
 
