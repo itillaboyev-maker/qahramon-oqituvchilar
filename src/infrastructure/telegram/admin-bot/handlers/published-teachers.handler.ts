@@ -159,15 +159,42 @@ export function registerPublishedTeachers(
             }
           }
 
-          if (!sent && media.telegramFileId) {
-            if (media.mediaType === "photo") {
-              await ctx.replyWithPhoto(media.telegramFileId);
-              sent = true;
-            } else if (media.mediaType === "video") {
-              await ctx.replyWithVideo(media.telegramFileId);
-              sent = true;
-            }
+         if (!sent && media.telegramFileId) {
+  try {
+    const publicBotToken = (env as { PUBLIC_BOT_TOKEN?: string }).PUBLIC_BOT_TOKEN;
+    if (publicBotToken) {
+      const fileRes = await fetch(
+        `https://api.telegram.org/bot${publicBotToken}/getFile?file_id=${media.telegramFileId}`,
+      );
+      const fileData = (await fileRes.json()) as any;
+      if (fileData.ok && fileData.result?.file_path) {
+        const downloadUrl = `https://api.telegram.org/file/bot${publicBotToken}/${fileData.result.file_path}`;
+        const binaryRes = await fetch(downloadUrl);
+        if (binaryRes.ok) {
+          const bytes = new Uint8Array(await binaryRes.arrayBuffer());
+          const filename = fileData.result.file_path.split("/").pop() ?? "media";
+          if (media.mediaType === "photo") {
+            await ctx.replyWithPhoto(new InputFile(bytes, filename));
+            sent = true;
+          } else if (media.mediaType === "video") {
+            await ctx.replyWithVideo(new InputFile(bytes, filename));
+            sent = true;
           }
+        }
+      } else {
+        logger.warn("published_teachers.telegram_fallback_getfile_failed", {
+          mediaId: media.id,
+          telegramResponse: fileData,
+        });
+      }
+    }
+  } catch (err) {
+    logger.error("published_teachers.telegram_fallback_failed", {
+      mediaId: media.id,
+      err: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
 
           if (!sent) {
             logger.warn("published_teachers.media_not_sent", {

@@ -1,0 +1,1 @@
+ALTER TABLE "recommendations" ADD COLUMN "teacher_phone" varchar(20);

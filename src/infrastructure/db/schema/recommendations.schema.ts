@@ -16,6 +16,7 @@ export const recommendations = pgTable(
     // Essential fields — collected in the fast (<2 min) submission flow
     recommenderName: varchar("recommender_name", { length: 255 }),
     recommenderPhone: varchar("recommender_phone", { length: 20 }), // optional, never required
+    teacherPhone: varchar("teacher_phone", { length: 20 }), // optional public-flow teacher contact number, separate from recommenderPhone
     relationship: relationshipEnum("relationship"),
     submissionType: submissionTypeEnum("submission_type").notNull(),
     recommendationText: text("recommendation_text"), // "why do you recommend this teacher"

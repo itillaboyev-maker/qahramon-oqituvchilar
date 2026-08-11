@@ -20,7 +20,8 @@ export class RecommendationRepository implements RecommendationRepositoryPort {
         status: "new",
 
         recommenderName: input.recommenderName ?? null,
-        recommenderPhone: input.teacherPhone ?? input.recommenderPhone ?? null,
+        recommenderPhone: input.recommenderPhone ?? null,
+        teacherPhone: input.teacherPhone ?? null,
         relationship: input.relationship ?? null,
         submissionType: input.submissionType,
         recommendationText: input.recommendationText ?? null,
@@ -35,7 +36,7 @@ export class RecommendationRepository implements RecommendationRepositoryPort {
       .returning();
 
     if (!row) throw new Error("Failed to create recommendation");
-    return { ...row, teacherPhone: input.teacherPhone ?? null } as Recommendation;
+    return row as Recommendation;
   }
 
   async findById(id: string): Promise<Recommendation | null> {

@@ -51,7 +51,14 @@ function formatRecommendation(
     .filter(Boolean)
     .join("\n");
 }
+const TELEGRAM_CAPTION_LIMIT = 1024;
+const TELEGRAM_MESSAGE_LIMIT = 4096;
 
+function truncateForTelegram(text: string, limit: number): string {
+  if (text.length <= limit) return text;
+  const suffix = "\n\n… (davomi kesildi)";
+  return text.slice(0, limit - suffix.length) + suffix;
+}
 export function registerModerationQueue(
   listPending: ListPendingRecommendationsUseCase,
   moderate: ModerateRecommendationUseCase,
@@ -89,6 +96,9 @@ export function registerModerationQueue(
       ),
     ].join("\n");
 
+    const captionText = truncateForTelegram(text, TELEGRAM_CAPTION_LIMIT);
+    const messageText = truncateForTelegram(text, TELEGRAM_MESSAGE_LIMIT);
+
     const r2Bucket = (env as { R2_BUCKET?: R2Bucket }).R2_BUCKET;
     let sent = false;
 
@@ -106,7 +116,7 @@ export function registerModerationQueue(
               await ctx.replyWithPhoto(
                 new InputFile(bytes, filename),
                 {
-                  caption: !sent ? text : undefined,
+                  caption: !sent ? captionText : undefined,
                   parse_mode: "HTML",
                   reply_markup: !sent ? kb : undefined,
                 },
@@ -115,7 +125,7 @@ export function registerModerationQueue(
               await ctx.replyWithVideo(
                 new InputFile(bytes, filename),
                 {
-                  caption: !sent ? text : undefined,
+                  caption: !sent ? captionText : undefined,
                   parse_mode: "HTML",
                   reply_markup: !sent ? kb : undefined,
                 },
@@ -130,13 +140,13 @@ export function registerModerationQueue(
         if (media.telegramFileId) {
           if (media.mediaType === "photo") {
             await ctx.replyWithPhoto(media.telegramFileId, {
-              caption: !sent ? text : undefined,
+              caption: !sent ? captionText : undefined,
               parse_mode: "HTML",
               reply_markup: !sent ? kb : undefined,
             });
           } else if (media.mediaType === "video") {
             await ctx.replyWithVideo(media.telegramFileId, {
-              caption: !sent ? text : undefined,
+              caption: !sent ? captionText : undefined,
               parse_mode: "HTML",
               reply_markup: !sent ? kb : undefined,
             });
@@ -150,7 +160,7 @@ export function registerModerationQueue(
     }
 
     if (!sent) {
-      await ctx.reply(text, {
+      await ctx.reply(messageText, {
         parse_mode: "HTML",
         reply_markup: kb,
       });
