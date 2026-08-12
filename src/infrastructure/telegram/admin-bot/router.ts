@@ -265,6 +265,14 @@ export function buildAdminBot(
     (ctx as unknown as { moderatorUserId: string }).moderatorUserId = user.id;
     await publishQueue.startEdit(ctx, teacherId, 0);
   });
+
+  bot.callbackQuery(/^edit_teacher:(.+)$/, async (ctx) => {
+    const [, teacherId] = ctx.match as unknown as [string, string];
+    const user = await userRepo.findByTelegramId(ctx.from.id);
+    if (!user) return;
+    (ctx as unknown as { moderatorUserId: string }).moderatorUserId = user.id;
+    await publishQueue.startEdit(ctx, teacherId, 0);
+  });
     const user = await userRepo.findByTelegramId(ctx.from.id);
     if (!user) return;
     (ctx as unknown as { moderatorUserId: string }).moderatorUserId = user.id;
