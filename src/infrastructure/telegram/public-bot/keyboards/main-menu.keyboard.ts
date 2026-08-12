@@ -1,16 +1,17 @@
-import { InlineKeyboard } from "grammy";
+﻿import { InlineKeyboard } from "grammy";
 import { t } from "../../../../i18n/translate";
 
 export function mainMenuKeyboard(): InlineKeyboard {
   return new InlineKeyboard()
     .text(t("menu.submit_info"), "menu:submit_info").row()
+    .text("рџ‘ЁвЂЌрџЏ« Ustozlar", "catalog:regions").row()
     .text(t("menu.about"), "menu:about").row()
     .text(t("menu.contact"), "menu:contact");
 }
 
 /**
  * Business rule A: the bot must always ask "who is this about" before starting any
- * submission, with "another teacher" visually emphasized as the encouraged default —
+ * submission, with "another teacher" visually emphasized as the encouraged default вЂ”
  * listed first, with a star, versus a plain circle for self-submission. Telegram
  * buttons can't be "pre-selected," so emphasis is carried by order + iconography + copy.
  */

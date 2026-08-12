@@ -18,7 +18,7 @@ export default {
           logger.warn("public_webhook_auth_failed", { path: url.pathname });
           return new Response("Unauthorized", { status: 401 });
         }
-        const bot = buildPublicBot(env.PUBLIC_BOT_TOKEN, env.REQUIRED_CHANNEL_ID, container);
+        const bot = buildPublicBot(env.PUBLIC_BOT_TOKEN, env.REQUIRED_CHANNEL_ID, container, env);
         return await webhookCallback(bot, "cloudflare-mod")(request);
       }
 

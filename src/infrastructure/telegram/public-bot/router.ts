@@ -1,14 +1,18 @@
-import { Bot, InlineKeyboard } from "grammy";
+﻿import { Bot, InlineKeyboard } from "grammy";
 import type { Container } from "../../config/di-container";
+import type { Env } from "../../config/env";
 import { subscriptionGuard } from "./middleware/subscription-guard.middleware";
 import { startHandler, checkSubscriptionHandler } from "./handlers/start.handler";
 import { registerNominationFlow } from "./handlers/nomination-flow.handler";
 import { registerSelfSubmissionFlow } from "./handlers/self-submission-flow.handler";
+import { registerCatalog } from "./handlers/catalog.handler";
+import { GetPublicTeacherCatalogUseCase } from "../../../application/use-cases/teacher/get-public-teacher-catalog.use-case";
+import { GetPublicTeacherProfileUseCase } from "../../../application/use-cases/teacher/get-public-teacher-profile.use-case";
 import { mainMenuKeyboard, whoIsThisAboutKeyboard } from "./keyboards/main-menu.keyboard";
 import { t } from "../../../i18n/translate";
 import { logger } from "../../logging/logger";
 
-export function buildPublicBot(botToken: string, requiredChannelId: string, container: Container) {
+export function buildPublicBot(botToken: string, requiredChannelId: string, container: Container, env: Env) {
   const bot = new Bot(botToken);
   const { publicTelegramClient } = container.telegramClients;
   const { registerUser, submitNomination } = container.useCases;
@@ -35,6 +39,18 @@ export function buildPublicBot(botToken: string, requiredChannelId: string, cont
     container.sessionStore,
     submitNomination,
   );
+
+  // NOTE: constructed directly from existing repos — no DI container changes made.
+  // If container.repos already exposes named getPublicTeacherCatalog/getPublicTeacherProfile
+  // use-cases elsewhere in the container, prefer wiring those instead of this local
+  // construction to avoid two instances existing side by side.
+  const getPublicTeacherCatalog = new GetPublicTeacherCatalogUseCase(container.repos.teacherRepo);
+  const getPublicTeacherProfile = new GetPublicTeacherProfileUseCase(
+    container.repos.teacherRepo,
+    container.repos.recommendationRepo,
+    container.repos.mediaRepo,
+  );
+  const catalog = registerCatalog(getPublicTeacherCatalog, getPublicTeacherProfile, env);
 
    bot.command("start", startHandler(registerUser));
 
@@ -103,6 +119,36 @@ bot.callbackQuery("recommender_phone:skip", async (ctx) => {
   bot.callbackQuery("menu:contact", async (ctx) => {
     await ctx.answerCallbackQuery();
     await ctx.reply("Savol va takliflar uchun: @qahramon_oqituvchilar_support");
+  });
+
+  // Public "👨‍🏫 Ustozlar" catalog — unauthenticated, published-only (see catalog.handler.ts).
+  // Registered before the generic callback_query:data dispatcher below so it never
+  // falls through to nomination/self-submission handling or the "unknown button" reply.
+  bot.callbackQuery("catalog:regions", async (ctx) => {
+    await ctx.answerCallbackQuery();
+    await catalog.showRegions(ctx);
+  });
+  bot.callbackQuery("catalog:noop", async (ctx) => {
+    await ctx.answerCallbackQuery();
+  });
+  bot.callbackQuery(/^catalog:region:(.+)$/, async (ctx) => {
+    const regionId = ctx.match?.[1];
+    if (!regionId) return;
+    await ctx.answerCallbackQuery();
+    await catalog.showDistricts(ctx, regionId);
+  });
+  bot.callbackQuery(/^catalog:district:(.+):(\d+)$/, async (ctx) => {
+    const districtId = ctx.match?.[1];
+    const pageStr = ctx.match?.[2];
+    if (!districtId || !pageStr) return;
+    await ctx.answerCallbackQuery();
+    await catalog.showTeachers(ctx, districtId, Number(pageStr));
+  });
+  bot.callbackQuery(/^catalog:teacher:(.+)$/, async (ctx) => {
+    const teacherId = ctx.match?.[1];
+    if (!teacherId) return;
+    await ctx.answerCallbackQuery();
+    await catalog.showProfile(ctx, teacherId);
   });
 
   // Both flows share these dispatch points — each handler checks bot_sessions.flowType

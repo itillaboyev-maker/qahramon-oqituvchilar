@@ -1,4 +1,4 @@
-import { eq, and, or, ilike, sql, asc, count } from "drizzle-orm";
+﻿import { eq, and, or, ilike, sql, asc, count } from "drizzle-orm";
 import type { Database } from "../client";
 import { teachers, regions, districts } from "../schema";
 import type {
@@ -6,9 +6,14 @@ import type {
   CandidatePrefilterInput,
   TeacherSearchFilters,
   TeacherPublishQueueItem,
+  RegionWithPublishedCount,
+  DistrictWithPublishedCount,
+  PublishedTeachersPage,
 } from "../../../application/ports/repositories/teacher.repository.port";
 import type { Teacher, NewTeacherInput } from "../../../domain/entities/teacher.entity";
 import { IDENTITY_RESOLUTION } from "../../../shared/constants/identity-resolution.constants";
+
+const PUBLISHED: Teacher["publishStatus"] = "published";
 
 export class TeacherRepository implements TeacherRepositoryPort {
   constructor(private readonly db: Database) {}
@@ -149,5 +154,78 @@ export class TeacherRepository implements TeacherRepositoryPort {
 
     if (!row) return null;
     return this.toPublishQueueItem(row);
+  }
+
+  // ---------------------------------------------------------------------
+  // PUBLIC catalog (Viloyat в†’ Tuman в†’ Ustoz в†’ Profil). Read-only, no auth.
+  // Inner-joins to teachers so only branches with published teachers appear.
+  // ---------------------------------------------------------------------
+
+  async listPublishedRegionsWithCounts(): Promise<RegionWithPublishedCount[]> {
+    const rows = await this.db
+      .select({
+        id: regions.id,
+        nameUzLatn: regions.nameUzLatn,
+        publishedCount: count(teachers.id),
+      })
+      .from(regions)
+      .innerJoin(teachers, and(eq(teachers.regionId, regions.id), eq(teachers.publishStatus, PUBLISHED)))
+      .groupBy(regions.id, regions.nameUzLatn)
+      .orderBy(asc(regions.nameUzLatn));
+
+    return rows.map((row) => ({
+      id: row.id,
+      nameUzLatn: row.nameUzLatn,
+      publishedCount: Number(row.publishedCount),
+    }));
+  }
+
+  async listPublishedDistrictsByRegion(regionId: string): Promise<DistrictWithPublishedCount[]> {
+    const rows = await this.db
+      .select({
+        id: districts.id,
+        nameUzLatn: districts.nameUzLatn,
+        publishedCount: count(teachers.id),
+      })
+      .from(districts)
+      .innerJoin(
+        teachers,
+        and(eq(teachers.districtId, districts.id), eq(teachers.publishStatus, PUBLISHED)),
+      )
+      .where(eq(districts.regionId, regionId))
+      .groupBy(districts.id, districts.nameUzLatn)
+      .orderBy(asc(districts.nameUzLatn));
+
+    return rows.map((row) => ({
+      id: row.id,
+      nameUzLatn: row.nameUzLatn,
+      publishedCount: Number(row.publishedCount),
+    }));
+  }
+
+  async listPublishedTeachersByDistrict(
+    districtId: string,
+    limit: number,
+    offset: number,
+  ): Promise<PublishedTeachersPage> {
+    const whereClause = and(eq(teachers.districtId, districtId), eq(teachers.publishStatus, PUBLISHED));
+
+    const [rows, [totalRow]] = await Promise.all([
+      this.db
+        .select({
+          id: teachers.id,
+          fullName: teachers.fullName,
+          school: teachers.school,
+          subject: teachers.subject,
+        })
+        .from(teachers)
+        .where(whereClause)
+        .orderBy(asc(teachers.fullName))
+        .limit(limit)
+        .offset(offset),
+      this.db.select({ value: count() }).from(teachers).where(whereClause),
+    ]);
+
+    return { items: rows, total: totalRow?.value ?? 0 };
   }
 }
