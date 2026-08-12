@@ -5,7 +5,7 @@ import type { Env } from "../../../config/env";
 import { logger } from "../../../logging/logger";
 
 /**
- * Public "рџ‘ЁвЂЌрџЏ« Ustozlar" catalog. Unauthenticated вЂ” every list here is already
+ * Public "👨‍🏫 Ustozlar" catalog. Unauthenticated — every list here is already
  * scoped to publishStatus="published" inside GetPublicTeacherCatalogUseCase /
  * GetPublicTeacherProfileUseCase, so this handler only needs to render.
  *
@@ -35,12 +35,12 @@ export function registerCatalog(
         regions = await getCatalog.listRegions();
       } catch (err) {
         logger.error("catalog.list_regions_failed", { err: err instanceof Error ? err.message : String(err) });
-        await safeReply(ctx, "вљ пёЏ Ustozlar ro'yxati yuklanmadi. Birozdan so'ng qayta urinib ko'ring.");
+        await safeReply(ctx, "⚠️ Ustozlar ro'yxati yuklanmadi. Birozdan so'ng qayta urinib ko'ring.");
         return;
       }
 
       if (regions.length === 0) {
-        await safeReply(ctx, "рџ—‚ Hozircha nashr qilingan ustozlar mavjud emas.");
+        await safeReply(ctx, "🗂 Hozircha nashr qilingan ustozlar mavjud emas.");
         return;
       }
 
@@ -49,7 +49,7 @@ export function registerCatalog(
         kb.text(`${region.name} (${region.publishedTeacherCount})`, `catalog:region:${region.id}`).row();
       });
 
-      await safeReply(ctx, "рџ‘ЁвЂЌрџЏ« Ustozlar\n\nViloyatni tanlang:", { reply_markup: kb });
+      await safeReply(ctx, "👨‍🏫 Ustozlar\n\nViloyatni tanlang:", { reply_markup: kb });
     },
 
     async showDistricts(ctx: Context, regionId: string) {
@@ -61,12 +61,12 @@ export function registerCatalog(
           regionId,
           err: err instanceof Error ? err.message : String(err),
         });
-        await safeReply(ctx, "вљ пёЏ Tumanlar ro'yxati yuklanmadi.");
+        await safeReply(ctx, "⚠️ Tumanlar ro'yxati yuklanmadi.");
         return;
       }
 
       if (districts.length === 0) {
-        await safeReply(ctx, "рџ—‚ Bu viloyatda hozircha nashr qilingan ustozlar mavjud emas.");
+        await safeReply(ctx, "🗂 Bu viloyatda hozircha nashr qilingan ustozlar mavjud emas.");
         return;
       }
 
@@ -74,7 +74,7 @@ export function registerCatalog(
       districts.forEach((district) => {
         kb.text(`${district.name} (${district.publishedTeacherCount})`, `catalog:district:${district.id}:0`).row();
       });
-      kb.text("в¬…пёЏ Viloyatlar", "catalog:regions");
+      kb.text("⬅️ Viloyatlar", "catalog:regions");
 
       await safeReply(ctx, "Tuman/Shaharni tanlang:", { reply_markup: kb });
     },
@@ -88,13 +88,13 @@ export function registerCatalog(
           districtId,
           err: err instanceof Error ? err.message : String(err),
         });
-        await safeReply(ctx, "вљ пёЏ Ustozlar ro'yxati yuklanmadi.");
+        await safeReply(ctx, "⚠️ Ustozlar ro'yxati yuklanmadi.");
         return;
       }
 
       if (result.total === 0) {
-        await safeReply(ctx, "рџ—‚ Bu tumanda hozircha nashr qilingan ustozlar mavjud emas.", {
-          reply_markup: new InlineKeyboard().text("в¬…пёЏ Viloyatlar", "catalog:regions"),
+        await safeReply(ctx, "🗂 Bu tumanda hozircha nashr qilingan ustozlar mavjud emas.", {
+          reply_markup: new InlineKeyboard().text("⬅️ Viloyatlar", "catalog:regions"),
         });
         return;
       }
@@ -105,14 +105,14 @@ export function registerCatalog(
       });
 
       if (result.totalPages > 1) {
-        kb.text("в¬…пёЏ", `catalog:district:${districtId}:${Math.max(0, result.page - 1)}`)
+        kb.text("⬅️", `catalog:district:${districtId}:${Math.max(0, result.page - 1)}`)
           .text(`${result.page + 1}/${result.totalPages}`, "catalog:noop")
-          .text("вћЎпёЏ", `catalog:district:${districtId}:${Math.min(result.totalPages - 1, result.page + 1)}`)
+          .text("➡️", `catalog:district:${districtId}:${Math.min(result.totalPages - 1, result.page + 1)}`)
           .row();
       }
-      kb.text("в¬…пёЏ Viloyatlar", "catalog:regions");
+      kb.text("⬅️ Viloyatlar", "catalog:regions");
 
-      await safeReply(ctx, `рџ‘ЁвЂЌрџЏ« Ustozlar (${result.total} ta):`, { reply_markup: kb });
+      await safeReply(ctx, `👨‍🏫 Ustozlar (${result.total} ta):`, { reply_markup: kb });
     },
 
     async showProfile(ctx: Context, teacherId: string) {
@@ -124,31 +124,31 @@ export function registerCatalog(
           teacherId,
           err: err instanceof Error ? err.message : String(err),
         });
-        await safeReply(ctx, "вљ пёЏ Ustoz profili yuklanmadi.");
+        await safeReply(ctx, "⚠️ Ustoz profili yuklanmadi.");
         return;
       }
 
       if (!profile) {
-        await safeReply(ctx, "вљ пёЏ Ustoz topilmadi yoki hali nashr qilinmagan.", {
-          reply_markup: new InlineKeyboard().text("в¬…пёЏ Viloyatlar", "catalog:regions"),
+        await safeReply(ctx, "⚠️ Ustoz topilmadi yoki hali nashr qilinmagan.", {
+          reply_markup: new InlineKeyboard().text("⬅️ Viloyatlar", "catalog:regions"),
         });
         return;
       }
 
-      const lines: string[] = [`рџ‘¤ ${profile.fullName}`];
+      const lines: string[] = [`👤 ${profile.fullName}`];
       if (profile.regionName || profile.districtName) {
-        lines.push(`рџ“Ќ ${profile.regionName ?? "-"} / ${profile.districtName ?? "-"}`);
+        lines.push(`📍 ${profile.regionName ?? "-"} / ${profile.districtName ?? "-"}`);
       }
-      if (profile.school) lines.push(`рџЏ« ${profile.school}`);
-      if (profile.subject) lines.push(`рџ“ Fan: ${profile.subject}`);
-      if (profile.position) lines.push(`рџ’ј Lavozim: ${profile.position}`);
-      if (profile.yearsOfExperience != null) lines.push(`вЏі Tajriba: ${profile.yearsOfExperience} yil`);
+      if (profile.school) lines.push(`🏫 ${profile.school}`);
+      if (profile.subject) lines.push(`📘 Fan: ${profile.subject}`);
+      if (profile.position) lines.push(`💼 Lavozim: ${profile.position}`);
+      if (profile.yearsOfExperience != null) lines.push(`⏳ Tajriba: ${profile.yearsOfExperience} yil`);
       if (profile.biography) lines.push(`\n${profile.biography}`);
-      if (profile.achievements) lines.push(`\nрџЏ† Yutuqlari:\n${profile.achievements}`);
-      if (profile.educationalPhilosophy) lines.push(`\nрџ’Ў Ta'lim falsafasi:\n${profile.educationalPhilosophy}`);
-      if (profile.impactStories) lines.push(`\nвњЁ Hikoyalar:\n${profile.impactStories}`);
+      if (profile.achievements) lines.push(`\n🏆 Yutuqlari:\n${profile.achievements}`);
+      if (profile.educationalPhilosophy) lines.push(`\n💡 Ta'lim falsafasi:\n${profile.educationalPhilosophy}`);
+      if (profile.impactStories) lines.push(`\n✨ Hikoyalar:\n${profile.impactStories}`);
 
-      const kb = new InlineKeyboard().text("в¬…пёЏ Viloyatlar", "catalog:regions");
+      const kb = new InlineKeyboard().text("⬅️ Viloyatlar", "catalog:regions");
       await safeReply(ctx, lines.join("\n"), { reply_markup: kb });
 
       await this.sendProfileMedia(ctx, profile.media);
