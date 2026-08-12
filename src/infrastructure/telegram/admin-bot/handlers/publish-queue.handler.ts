@@ -1,4 +1,4 @@
-import { InlineKeyboard, InputFile, type Context } from "grammy";
+﻿import { InlineKeyboard, InputFile, type Context } from "grammy";
 import type { ListPublishQueueUseCase } from "../../../../application/use-cases/teacher/list-publish-queue.use-case";
 import type { GetTeacherPublishDetailUseCase } from "../../../../application/use-cases/teacher/get-teacher-publish-detail.use-case";
 import type { PublishTeacherUseCase } from "../../../../application/use-cases/teacher/publish-teacher.use-case";
@@ -204,8 +204,7 @@ export function registerPublishQueue(
       }
 
       const kb = new InlineKeyboard()
-        .text("⬅️ Back", `publish:list:${fromPage}`)
-        .text("📢 Publish", `publish:confirm:${teacher.id}`);
+        .text("✏️ Tahrirlash", `edit_teacher:${teacher.id}`) .text("⬅️ Back", `publish:list:${fromPage}`) .text("📢 Publish", `publish:confirm:${teacher.id}`);
 logger.info("publish_queue.media_debug", {
   teacherId: teacher.id,
   recommendations: detail.recommendations.map((r) => ({
