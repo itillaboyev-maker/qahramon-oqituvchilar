@@ -57,6 +57,13 @@
       "when": 1786450520361,
       "tag": "0007_talented_longshot",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1786526281187,
+      "tag": "0008_futuristic_starbolt",
+      "breakpoints": true
     }
   ]
 }

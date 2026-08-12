@@ -1,4 +1,4 @@
-﻿import { eq, and, or, ilike, sql, asc, count, gte } from "drizzle-orm";
+import { eq, and, or, ilike, sql, asc, count, gte } from "drizzle-orm";
 import type { Database } from "../client";
 import { teachers, regions, districts } from "../schema";
 import type {
@@ -61,6 +61,17 @@ export class TeacherRepository implements TeacherRepositoryPort {
     const [row] = await this.db
       .update(teachers)
       .set({ publishStatus: status, updatedAt: sql`now()` })
+      .where(eq(teachers.id, id))
+      .returning();
+
+    if (!row) throw new Error(`Teacher not found: ${id}`);
+    return row as Teacher;
+  }
+
+  async updateBiography(id: string, biography: string): Promise<Teacher> {
+    const [row] = await this.db
+      .update(teachers)
+      .set({ biography, updatedAt: sql`now()` })
       .where(eq(teachers.id, id))
       .returning();
 
@@ -158,7 +169,7 @@ export class TeacherRepository implements TeacherRepositoryPort {
   }
 
   // ---------------------------------------------------------------------
-  // PUBLIC catalog (Viloyat → Tuman → Ustoz → Profil). Read-only, no auth.
+  // PUBLIC catalog (Viloyat > Tuman > Ustoz > Profil). Read-only, no auth.
   // Inner-joins to teachers so only branches with published teachers appear.
   // ---------------------------------------------------------------------
 

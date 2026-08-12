@@ -90,6 +90,8 @@ export function buildAdminBot(
     listPublishQueue,
     getTeacherPublishDetail,
     publishTeacher,
+    teacherRepo,
+    container.sessionStore,
     env,
   );
 
@@ -251,6 +253,21 @@ export function buildAdminBot(
     (ctx as unknown as { moderatorUserId: string }).moderatorUserId = user.id;
 
     await publishQueue.showDetail(ctx, teacherId, Number(pageStr) || 0);
+  });
+
+  bot.callbackQuery(/^publish:edit:(.+):(\d+)$/, async (ctx) => {
+    const [, teacherId, pageStr] = ctx.match as unknown as [string, string, string];
+    const user = await userRepo.findByTelegramId(ctx.from.id);
+    if (!user) return;
+    (ctx as unknown as { moderatorUserId: string }).moderatorUserId = user.id;
+    await publishQueue.startEdit(ctx, teacherId, Number(pageStr) || 0);
+  });
+
+  bot.on("message:text", async (ctx) => {
+    const user = await userRepo.findByTelegramId(ctx.from!.id);
+    if (!user) return;
+    (ctx as unknown as { moderatorUserId: string }).moderatorUserId = user.id;
+    await publishQueue.handleEditText(ctx, ctx.message.text);
   });
 
   bot.callbackQuery("publish:noop", async (ctx) => {

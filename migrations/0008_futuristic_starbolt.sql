@@ -1,0 +1,1 @@
+ALTER TYPE "public"."flow_type" ADD VALUE 'teacher_edit';

@@ -2,13 +2,15 @@ import { InlineKeyboard, InputFile, type Context } from "grammy";
 import type { ListPublishQueueUseCase } from "../../../../application/use-cases/teacher/list-publish-queue.use-case";
 import type { GetTeacherPublishDetailUseCase } from "../../../../application/use-cases/teacher/get-teacher-publish-detail.use-case";
 import type { PublishTeacherUseCase } from "../../../../application/use-cases/teacher/publish-teacher.use-case";
+import type { TeacherRepositoryPort } from "../../../../application/ports/repositories/teacher.repository.port";
+import type { SessionStorePort } from "../../../../application/ports/session/session-store.port";
 import type { Env } from "../../../config/env";
 import { logger } from "../../../logging/logger";
 
 export function registerPublishQueue(
   listPublishQueue: ListPublishQueueUseCase,
   getTeacherPublishDetail: GetTeacherPublishDetailUseCase,
-  publishTeacher: PublishTeacherUseCase,
+  publishTeacher: PublishTeacherUseCase, teacherRepo: TeacherRepositoryPort, sessionStore: SessionStorePort,
   env: Env,
 ) {
   async function safeReply(
@@ -82,6 +84,32 @@ export function registerPublishQueue(
   }
 
   return {
+    async startEdit(ctx: Context, teacherId: string, fromPage: number) {
+      const moderatorUserId = moderatorUserIdOf(ctx);
+      const session = await sessionStore.start(moderatorUserId, "admin", "teacher_edit");
+      await sessionStore.update(session.id, { collectedData: { teacherId, fromPage } });
+      await safeReply(ctx, "Yangi matnni yuboring. Bekor qilish uchun /cancel yozing.");
+    },
+
+    async handleEditText(ctx: Context, text: string): Promise<boolean> {
+      const moderatorUserId = moderatorUserIdOf(ctx);
+      const session = await sessionStore.get(moderatorUserId, "admin");
+      if (!session || session.flowType !== "teacher_edit") return false;
+      const data = session.collectedData as { teacherId?: string; fromPage?: number };
+      if (!data.teacherId) { await sessionStore.clear(session.id); return false; }
+      if (text.trim() === "/cancel") { await sessionStore.clear(session.id); await safeReply(ctx, "Tahrirlash bekor qilindi."); return true; }
+      try {
+        await teacherRepo.updateBiography(data.teacherId, text.trim());
+      } catch (err) {
+        logger.error("publish_queue.edit_save_failed", { teacherId: data.teacherId, err: err instanceof Error ? err.message : String(err) });
+        await safeReply(ctx, "Matnni saqlashda xatolik yuz berdi.");
+        return true;
+      }
+      await sessionStore.clear(session.id);
+      await safeReply(ctx, "Matn yangilandi.");
+      await this.showDetail(ctx, data.teacherId, data.fromPage ?? 0);
+      return true;
+    },
     async showQueue(ctx: Context, page = 0) {
       const moderatorUserId = moderatorUserIdOf(ctx);
 
