@@ -2,6 +2,7 @@
 import type { RecommendationRepositoryPort } from "../../ports/repositories/recommendation.repository.port";
 import type { MediaRepositoryPort } from "../../ports/repositories/media.repository.port";
 import type { PublicTeacherProfile } from "../../dto/public-teacher-catalog.dto";
+import { CATALOG_VISIBLE_SINCE } from "../../../shared/constants/catalog.constants";
 
 export interface GetPublicTeacherProfileInput {
   teacherId: string;
@@ -28,6 +29,9 @@ export class GetPublicTeacherProfileUseCase {
   async execute(input: GetPublicTeacherProfileInput): Promise<PublicTeacherProfile | null> {
     const teacher = await this.teacherRepo.findPublishQueueDetailById(input.teacherId);
     if (!teacher || teacher.publishStatus !== "published") {
+      return null;
+    }
+    if (new Date(teacher.createdAt) < new Date(CATALOG_VISIBLE_SINCE)) {
       return null;
     }
 

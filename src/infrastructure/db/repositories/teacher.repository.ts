@@ -1,4 +1,4 @@
-﻿import { eq, and, or, ilike, sql, asc, count } from "drizzle-orm";
+﻿import { eq, and, or, ilike, sql, asc, count, gte } from "drizzle-orm";
 import type { Database } from "../client";
 import { teachers, regions, districts } from "../schema";
 import type {
@@ -12,6 +12,7 @@ import type {
 } from "../../../application/ports/repositories/teacher.repository.port";
 import type { Teacher, NewTeacherInput } from "../../../domain/entities/teacher.entity";
 import { IDENTITY_RESOLUTION } from "../../../shared/constants/identity-resolution.constants";
+import { CATALOG_VISIBLE_SINCE } from "../../../shared/constants/catalog.constants";
 
 const PUBLISHED: Teacher["publishStatus"] = "published";
 
@@ -157,7 +158,7 @@ export class TeacherRepository implements TeacherRepositoryPort {
   }
 
   // ---------------------------------------------------------------------
-  // PUBLIC catalog (Viloyat в†’ Tuman в†’ Ustoz в†’ Profil). Read-only, no auth.
+  // PUBLIC catalog (Viloyat → Tuman → Ustoz → Profil). Read-only, no auth.
   // Inner-joins to teachers so only branches with published teachers appear.
   // ---------------------------------------------------------------------
 
@@ -208,7 +209,11 @@ export class TeacherRepository implements TeacherRepositoryPort {
     limit: number,
     offset: number,
   ): Promise<PublishedTeachersPage> {
-    const whereClause = and(eq(teachers.districtId, districtId), eq(teachers.publishStatus, PUBLISHED));
+    const whereClause = and(
+      eq(teachers.districtId, districtId),
+      eq(teachers.publishStatus, PUBLISHED),
+      gte(teachers.createdAt, sql`${CATALOG_VISIBLE_SINCE}::timestamptz`),
+    );
 
     const [rows, [totalRow]] = await Promise.all([
       this.db
