@@ -255,24 +255,8 @@ export function buildAdminBot(
     await publishQueue.showDetail(ctx, teacherId, Number(pageStr) || 0);
   });
 
-  bot.callbackQuery(/^publish:edit:(.+):(\d+)$/, async (ctx) => {
+  bot.callbackQuery(/^edit_teacher:(.+):(\d+)$/, async (ctx) => {
     const [, teacherId, pageStr] = ctx.match as unknown as [string, string, string];
-
-  bot.callbackQuery(/^edit_teacher:(.+)$/, async (ctx) => {
-    const [, teacherId] = ctx.match as unknown as [string, string];
-    const user = await userRepo.findByTelegramId(ctx.from.id);
-    if (!user) return;
-    (ctx as unknown as { moderatorUserId: string }).moderatorUserId = user.id;
-    await publishQueue.startEdit(ctx, teacherId, 0);
-  });
-
-  bot.callbackQuery(/^edit_teacher:(.+)$/, async (ctx) => {
-    const [, teacherId] = ctx.match as unknown as [string, string];
-    const user = await userRepo.findByTelegramId(ctx.from.id);
-    if (!user) return;
-    (ctx as unknown as { moderatorUserId: string }).moderatorUserId = user.id;
-    await publishQueue.startEdit(ctx, teacherId, 0);
-  });
     const user = await userRepo.findByTelegramId(ctx.from.id);
     if (!user) return;
     (ctx as unknown as { moderatorUserId: string }).moderatorUserId = user.id;
