@@ -190,6 +190,8 @@ export function registerPublishQueue(
         `Position: ${teacher.position ?? "-"}`,
         `Current publish status: ${teacher.publishStatus}`,
         "",
+        `Story: ${teacher.biography ?? "(not written yet)"}`,
+        "",
         `Independent recommendations: ${detail.independentRecommendationCount}`,
         "",
       ];
