@@ -204,7 +204,7 @@ export function registerPublishQueue(
       }
 
       const kb = new InlineKeyboard()
-        .text("✏️ Tahrirlash", `edit_teacher:${teacher.id}`) .text("⬅️ Back", `publish:list:${fromPage}`) .text("📢 Publish", `publish:confirm:${teacher.id}`);
+        .text("✏️ Tahrirlash", `edit_teacher:${teacher.id}:${fromPage}`) .text("⬅️ Back", `publish:list:${fromPage}`) .text("📢 Publish", `publish:confirm:${teacher.id}`);
 logger.info("publish_queue.media_debug", {
   teacherId: teacher.id,
   recommendations: detail.recommendations.map((r) => ({
