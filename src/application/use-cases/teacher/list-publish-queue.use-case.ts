@@ -11,6 +11,7 @@ export interface PublishQueueEntry {
 export interface ListPublishQueueInput {
   moderatorUserId: string;
   page: number;
+  track?: "general" | "top";
 }
 
 export interface ListPublishQueueResult {
@@ -47,8 +48,8 @@ export class ListPublishQueueUseCase {
     const offset = page * PAGE_SIZE;
 
     const [teachers, total] = await Promise.all([
-      this.teacherRepo.listPublishQueue("ready_for_publish", PAGE_SIZE, offset),
-      this.teacherRepo.countByPublishStatus("ready_for_publish"),
+      this.teacherRepo.listPublishQueueByTrack("ready_for_publish", input.track ?? "general", PAGE_SIZE, offset),
+      this.teacherRepo.countByPublishStatusAndTrack("ready_for_publish", input.track ?? "general"),
     ]);
 
     const counts = await this.recommendationRepo.countIndependentByTeacherIds(

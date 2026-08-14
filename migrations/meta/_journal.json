@@ -64,6 +64,13 @@
       "when": 1786526281187,
       "tag": "0008_futuristic_starbolt",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1786690373300,
+      "tag": "0009_romantic_talisman",
+      "breakpoints": true
     }
   ]
 }

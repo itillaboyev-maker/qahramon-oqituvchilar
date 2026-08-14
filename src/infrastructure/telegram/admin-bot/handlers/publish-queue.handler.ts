@@ -1,4 +1,4 @@
-﻿import { InlineKeyboard, InputFile, type Context } from "grammy";
+import { InlineKeyboard, InputFile, type Context } from "grammy";
 import type { ListPublishQueueUseCase } from "../../../../application/use-cases/teacher/list-publish-queue.use-case";
 import type { GetTeacherPublishDetailUseCase } from "../../../../application/use-cases/teacher/get-teacher-publish-detail.use-case";
 import type { PublishTeacherUseCase } from "../../../../application/use-cases/teacher/publish-teacher.use-case";
@@ -10,7 +10,7 @@ import { logger } from "../../../logging/logger";
 export function registerPublishQueue(
   listPublishQueue: ListPublishQueueUseCase,
   getTeacherPublishDetail: GetTeacherPublishDetailUseCase,
-  publishTeacher: PublishTeacherUseCase, teacherRepo: TeacherRepositoryPort, sessionStore: SessionStorePort,
+  publishTeacher: PublishTeacherUseCase, teacherRepo: TeacherRepositoryPort, sessionStore: SessionStorePort, prefix: string = "publish", track: "general" | "top" = "general",
   env: Env,
 ) {
   async function safeReply(
@@ -115,22 +115,22 @@ export function registerPublishQueue(
 
       let result;
       try {
-        result = await listPublishQueue.execute({ moderatorUserId, page });
+        result = await listPublishQueue.execute({ moderatorUserId, page, track });
       } catch (err) {
         logger.error("publish_queue.list_failed", {
           err: err instanceof Error ? err.message : String(err),
         });
-        await safeReply(ctx, "⚠️ Failed to load the publish queue.");
+        await safeReply(ctx, "?? Failed to load the publish queue.");
         return;
       }
 
       if (result.total === 0) {
-        await safeReply(ctx, "🗂 Publish queue is empty.");
+        await safeReply(ctx, "?? Publish queue is empty.");
         return;
       }
 
       const lines: string[] = [
-        "📢 Publish Queue",
+        "?? Publish Queue",
         "Review:",
         `${result.total} teachers`,
         "",
@@ -139,22 +139,22 @@ export function registerPublishQueue(
       result.items.forEach((entry, idx) => {
         const num = result.page * result.pageSize + idx + 1;
         lines.push(`${num}.`);
-        lines.push(`👤 ${entry.teacher.fullName}`);
-        if (entry.teacher.school) lines.push(`🏫 ${entry.teacher.school}`);
-        if (entry.teacher.regionName) lines.push(`📍 ${entry.teacher.regionName}`);
-        lines.push(`📊 ${entry.independentRecommendationCount} recommendations`);
+        lines.push(`?? ${entry.teacher.fullName}`);
+        if (entry.teacher.school) lines.push(`?? ${entry.teacher.school}`);
+        if (entry.teacher.regionName) lines.push(`?? ${entry.teacher.regionName}`);
+        lines.push(`?? ${entry.independentRecommendationCount} recommendations`);
         lines.push(`Status: ${entry.teacher.publishStatus}`);
         lines.push("----------------");
       });
 
       const kb = new InlineKeyboard();
       result.items.forEach((entry) => {
-        kb.text("📂 Open", `publish:view:${entry.teacher.id}:${result.page}`).row();
+        kb.text("?? Open", `${prefix}:view:${entry.teacher.id}:${result.page}`).row();
       });
 
-      kb.text("⬅️ Previous", `publish:list:${Math.max(0, result.page - 1)}`)
+      kb.text("?? Previous", `${prefix}:list:${Math.max(0, result.page - 1)}`)
         .text(`Page ${result.page + 1}/${result.totalPages}`, "publish:noop")
-        .text("Next ➡️", `publish:list:${Math.min(result.totalPages - 1, result.page + 1)}`);
+        .text("Next ??", `${prefix}:list:${Math.min(result.totalPages - 1, result.page + 1)}`);
 
       await safeReply(ctx, lines.join("\n"), { reply_markup: kb });
     },
@@ -171,18 +171,18 @@ export function registerPublishQueue(
           teacherId,
           err: err instanceof Error ? err.message : String(err),
         });
-        await safeReply(ctx, "⚠️ Failed to load teacher profile.");
+        await safeReply(ctx, "?? Failed to load teacher profile.");
         return;
       }
 
       if (!detail) {
-        await safeReply(ctx, "⚠️ Teacher not found.");
+        await safeReply(ctx, "?? Teacher not found.");
         return;
       }
 
       const { teacher } = detail;
       const lines: string[] = [
-        `👤 ${teacher.fullName}`,
+        `?? ${teacher.fullName}`,
         `Region: ${teacher.regionName ?? "-"}`,
         `District: ${teacher.districtName ?? "-"}`,
         `School: ${teacher.school ?? "-"}`,
@@ -200,13 +200,13 @@ export function registerPublishQueue(
         lines.push("Public content:");
         for (const { mediaSummary } of detail.recommendations) {
           lines.push(`- Approved public profile content`);
-          lines.push(`  🖼 ${mediaSummary}`);
+          lines.push(`  ?? ${mediaSummary}`);
           lines.push("");
         }
       }
 
       const kb = new InlineKeyboard()
-        .text("✏️ Tahrirlash", `edit_teacher:${teacher.id}:${fromPage}`) .text("⬅️ Back", `publish:list:${fromPage}`) .text("📢 Publish", `publish:confirm:${teacher.id}`);
+        .text("?? Tahrirlash", `edit_teacher:${teacher.id}:${fromPage}`) .text("?? Back", `${prefix}:list:${fromPage}`) .row() .text("? Rad etish", `${prefix}:reject:${teacher.id}`) .text("?? Publish", `${prefix}:confirm:${teacher.id}`).row().text(track === "top" ? "Oddiy navbatga qaytarish" : "TOP navbatiga qoshish", track === "top" ? `assign_general:${teacher.id}:${fromPage}` : `assign_top:${teacher.id}:${fromPage}`);
 logger.info("publish_queue.media_debug", {
   teacherId: teacher.id,
   recommendations: detail.recommendations.map((r) => ({
@@ -228,6 +228,18 @@ logger.info("publish_queue.media_debug", {
       }
     },
 
+    async handleReject(ctx: Context, teacherId: string) {
+      const moderatorUserId = moderatorUserIdOf(ctx);
+      try {
+        await teacherRepo.updatePublishStatus(teacherId, "draft");
+      } catch (err) {
+        logger.error("publish_queue.reject_failed", { teacherId, err: err instanceof Error ? err.message : String(err) });
+        await ctx.answerCallbackQuery({ text: (err as Error).message, show_alert: true });
+        return;
+      }
+      await ctx.answerCallbackQuery({ text: "Rad etildi" });
+      await safeReply(ctx, "Profil rad etildi va draft holatiga qaytarildi.");
+    },
     async handlePublish(ctx: Context, teacherId: string) {
       const moderatorUserId = moderatorUserIdOf(ctx);
 
@@ -248,7 +260,7 @@ logger.info("publish_queue.media_debug", {
       await ctx.answerCallbackQuery({ text: "Published" });
 
       try {
-        await ctx.editMessageText("✅ Teacher profile published successfully.", {
+        await ctx.editMessageText("? Teacher profile published successfully.", {
           reply_markup: { inline_keyboard: [] },
         });
       } catch (err) {
@@ -256,7 +268,7 @@ logger.info("publish_queue.media_debug", {
           teacherId,
           err: err instanceof Error ? err.message : String(err),
         });
-        await safeReply(ctx, "✅ Teacher profile published successfully.");
+        await safeReply(ctx, "? Teacher profile published successfully.");
       }
     },
   };

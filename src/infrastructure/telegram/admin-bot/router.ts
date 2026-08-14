@@ -1,4 +1,4 @@
-﻿import { Bot } from "grammy";
+import { Bot } from "grammy";
 import type { Context } from "grammy";
 
 import type { Container } from "../../config/di-container";
@@ -18,9 +18,18 @@ export function buildAdminBot(
   container: Container,
   env: Env,
 ) {
-  console.log("рџ”Ґ BUILD ADMIN BOT");
+  console.log("🔥 BUILD ADMIN BOT");
 
   const bot = new Bot(botToken);
+
+  bot.api.setMyCommands([
+    { command: "queue", description: "Yangi arizalar navbati" },
+    { command: "publish_queue", description: "Nashrga tayyor profillar" },
+    { command: "top", description: "Eng kuchli nomzodlar" },
+    { command: "merge_queue", description: "Ehtimoliy dublikatlar" },
+    { command: "teachers", description: "Nashrdagi ustozlar katalogi" },
+    { command: "search", description: "Ustozlarni qidirish" },
+  ]).catch((err) => logger.error("set_commands_failed", { err: String(err) }));
 
   bot.init().then(() => {
     console.log("ADMIN BOT ID:", bot.botInfo.id);
@@ -92,6 +101,8 @@ export function buildAdminBot(
     publishTeacher,
     teacherRepo,
     container.sessionStore,
+    "publish",
+    "general",
     env,
   );
 
@@ -99,11 +110,11 @@ export function buildAdminBot(
   bot.command("start", async (ctx) => {
     await ctx.reply(
       "Moderator paneli.\n\n" +
-        "/queue вЂ” tavsiyalar navbati\n" +
-        "/merge_queue вЂ” ehtimoliy dublikatlar navbati\n" +
-        "/publish_queue вЂ” nashrga tayyor profillar navbati\n" +
-        "/teachers вЂ” nashrdagi ustozlar katalogi\n" +
-        "/search <matn> вЂ” ustozlarni qidirish",
+        "/queue — tavsiyalar navbati\n" +
+        "/merge_queue — ehtimoliy dublikatlar navbati\n" +
+        "/publish_queue — nashrga tayyor profillar navbati\n" +
+        "/teachers — nashrdagi ustozlar katalogi\n" +
+        "/search <matn> — ustozlarni qidirish",
     );
   });
 
@@ -131,6 +142,80 @@ export function buildAdminBot(
     mergeQueue.showQueue(ctx),
   );
 
+  const topQueue = registerPublishQueue(
+    listPublishQueue,
+    getTeacherPublishDetail,
+    publishTeacher,
+    teacherRepo,
+    container.sessionStore,
+    "top",
+    "top",
+    env,
+  );
+
+  bot.command("top", async (ctx) => {
+    if (!ctx.from) return;
+    const user = await userRepo.findByTelegramId(ctx.from.id);
+    if (!user) return;
+    (ctx as unknown as { moderatorUserId: string }).moderatorUserId = user.id;
+    await topQueue.showQueue(ctx, 0);
+  });
+
+  bot.callbackQuery(/^top:list:(\d+)$/, async (ctx) => {
+    const [, pageStr] = ctx.match as unknown as [string, string];
+    const user = await userRepo.findByTelegramId(ctx.from.id);
+    if (!user) return;
+    (ctx as unknown as { moderatorUserId: string }).moderatorUserId = user.id;
+    await topQueue.showQueue(ctx, Number(pageStr) || 0);
+  });
+
+  bot.callbackQuery(/^top:view:(.+):(\d+)$/, async (ctx) => {
+    const [, teacherId, pageStr] = ctx.match as unknown as [string, string, string];
+    const user = await userRepo.findByTelegramId(ctx.from.id);
+    if (!user) return;
+    (ctx as unknown as { moderatorUserId: string }).moderatorUserId = user.id;
+    await topQueue.showDetail(ctx, teacherId, Number(pageStr) || 0);
+  });
+
+  bot.callbackQuery(/^top:confirm:(.+)$/, async (ctx) => {
+    const [, teacherId] = ctx.match as unknown as [string, string];
+    const user = await userRepo.findByTelegramId(ctx.from.id);
+    if (!user) return;
+    (ctx as unknown as { moderatorUserId: string }).moderatorUserId = user.id;
+    await topQueue.handlePublish(ctx, teacherId);
+  });
+
+  bot.callbackQuery(/^top:reject:(.+)$/, async (ctx) => {
+    const [, teacherId] = ctx.match as unknown as [string, string];
+    const user = await userRepo.findByTelegramId(ctx.from.id);
+    if (!user) return;
+    (ctx as unknown as { moderatorUserId: string }).moderatorUserId = user.id;
+    await topQueue.handleReject(ctx, teacherId);
+  });
+
+  bot.callbackQuery("top:noop", async (ctx) => {
+    await ctx.answerCallbackQuery();
+  });
+
+  bot.callbackQuery(/^assign_top:(.+):(\d+)$/, async (ctx) => {
+    const [, teacherId, pageStr] = ctx.match as unknown as [string, string, string];
+    const user = await userRepo.findByTelegramId(ctx.from.id);
+    if (!user) return;
+    await teacherRepo.updateModerationTrack(teacherId, "top");
+    await ctx.answerCallbackQuery({ text: "TOP navbatiga qo'shildi" });
+    (ctx as unknown as { moderatorUserId: string }).moderatorUserId = user.id;
+    await publishQueue.showQueue(ctx, Number(pageStr) || 0);
+  });
+
+  bot.callbackQuery(/^assign_general:(.+):(\d+)$/, async (ctx) => {
+    const [, teacherId, pageStr] = ctx.match as unknown as [string, string, string];
+    const user = await userRepo.findByTelegramId(ctx.from.id);
+    if (!user) return;
+    await teacherRepo.updateModerationTrack(teacherId, "general");
+    await ctx.answerCallbackQuery({ text: "Oddiy navbatga qaytarildi" });
+    (ctx as unknown as { moderatorUserId: string }).moderatorUserId = user.id;
+    await topQueue.showQueue(ctx, Number(pageStr) || 0);
+  });
   bot.command("publish_queue", async (ctx) => {
     if (!ctx.from) return;
 
@@ -168,7 +253,7 @@ export function buildAdminBot(
 
       const lines = results.map(
         (r: any) =>
-          `рџ‘¤ <b>${r.fullName}</b> вЂ” ${r.school ?? "-"} (${r.publishStatus})`,
+          `👤 <b>${r.fullName}</b> — ${r.school ?? "-"} (${r.publishStatus})`,
       );
 
       await ctx.reply(lines.join("\n"), {
@@ -268,6 +353,14 @@ export function buildAdminBot(
     if (!user) return;
     (ctx as unknown as { moderatorUserId: string }).moderatorUserId = user.id;
     await publishQueue.handleEditText(ctx, ctx.message.text);
+  });
+
+  bot.callbackQuery(/^publish:reject:(.+)$/, async (ctx) => {
+    const [, teacherId] = ctx.match as unknown as [string, string];
+    const user = await userRepo.findByTelegramId(ctx.from.id);
+    if (!user) return;
+    (ctx as unknown as { moderatorUserId: string }).moderatorUserId = user.id;
+    await publishQueue.handleReject(ctx, teacherId);
   });
 
   bot.callbackQuery("publish:noop", async (ctx) => {

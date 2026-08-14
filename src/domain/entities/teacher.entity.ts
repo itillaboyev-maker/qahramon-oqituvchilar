@@ -15,6 +15,7 @@ export interface Teacher {
   educationalPhilosophy: string | null;
   impactStories: string | null;
   publishStatus: PublishStatus;
+  moderationTrack: "general" | "top";
   mergedIntoTeacherId: string | null;
   createdAt: Date;
   updatedAt: Date;

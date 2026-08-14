@@ -1,7 +1,7 @@
 import { pgTable, uuid, varchar, integer, text, timestamp, index, type AnyPgColumn } from "drizzle-orm/pg-core";
 import { regions } from "./regions.schema";
 import { districts } from "./districts.schema";
-import { publishStatusEnum } from "./enums";
+import { publishStatusEnum, moderationTrackEnum } from "./enums";
 
 // NOTE: recommendation-first flow — this table is never written to directly by the bot.
 // find-or-create-teacher.use-case.ts either attaches to an existing row (matched via
@@ -27,6 +27,7 @@ export const teachers = pgTable(
     educationalPhilosophy: text("educational_philosophy"),
     impactStories: text("impact_stories"),
     publishStatus: publishStatusEnum("publish_status").default("draft").notNull(),
+    moderationTrack: moderationTrackEnum("moderation_track").default("general").notNull(),
     // Merge workflow (business rule F): when a moderator confirms two profiles are the
     // same person, the LOSING profile is never deleted — it's kept, marked 'archived',
     // and pointed here at the winner. All of its recommendations/media are reassigned

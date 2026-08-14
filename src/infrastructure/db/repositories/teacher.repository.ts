@@ -79,6 +79,41 @@ export class TeacherRepository implements TeacherRepositoryPort {
     return row as Teacher;
   }
 
+  async updateModerationTrack(id: string, track: Teacher["moderationTrack"]): Promise<Teacher> {
+    const [row] = await this.db
+      .update(teachers)
+      .set({ moderationTrack: track, updatedAt: sql`now()` })
+      .where(eq(teachers.id, id))
+      .returning();
+    if (!row) throw new Error(`Teacher not found: ${id}`);
+    return row as Teacher;
+  }
+
+  async listPublishQueueByTrack(
+    status: Teacher["publishStatus"],
+    track: Teacher["moderationTrack"],
+    limit: number,
+    offset: number,
+  ): Promise<TeacherPublishQueueItem[]> {
+    const rows = await this.db
+      .select({ teacher: teachers, regionName: regions.nameUzLatn, districtName: districts.nameUzLatn })
+      .from(teachers)
+      .leftJoin(regions, eq(teachers.regionId, regions.id))
+      .leftJoin(districts, eq(teachers.districtId, districts.id))
+      .where(and(eq(teachers.publishStatus, status), eq(teachers.moderationTrack, track)))
+      .orderBy(asc(teachers.createdAt))
+      .limit(limit)
+      .offset(offset);
+    return rows.map((row) => this.toPublishQueueItem(row));
+  }
+
+  async countByPublishStatusAndTrack(status: Teacher["publishStatus"], track: Teacher["moderationTrack"]): Promise<number> {
+    const [row] = await this.db
+      .select({ value: count() })
+      .from(teachers)
+      .where(and(eq(teachers.publishStatus, status), eq(teachers.moderationTrack, track)));
+    return row?.value ?? 0;
+  }
   async markMerged(loserId: string, winnerId: string): Promise<Teacher> {
     const [row] = await this.db
       .update(teachers)

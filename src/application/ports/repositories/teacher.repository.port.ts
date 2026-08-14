@@ -58,6 +58,10 @@ export interface TeacherRepositoryPort {
   findCandidatesByNameSimilarity(input: CandidatePrefilterInput): Promise<Teacher[]>;
   create(input: NewTeacherInput): Promise<Teacher>;
   updatePublishStatus(id: string, status: Teacher["publishStatus"]): Promise<Teacher>;
+  /** TOP moderation track — separate editorial queue, exclusive with "general". */
+  updateModerationTrack(id: string, track: Teacher["moderationTrack"]): Promise<Teacher>;
+  listPublishQueueByTrack(status: Teacher["publishStatus"], track: Teacher["moderationTrack"], limit: number, offset: number): Promise<TeacherPublishQueueItem[]>;
+  countByPublishStatusAndTrack(status: Teacher["publishStatus"], track: Teacher["moderationTrack"]): Promise<number>;
   /** Moderator-edited public story text, applied before publish. */
   updateBiography(id: string, biography: string): Promise<Teacher>;
   /**

@@ -4,6 +4,8 @@ export const userRoleEnum = pgEnum("user_role", ["user", "moderator", "editor", 
 
 export const localeEnum = pgEnum("locale", ["uz-latn", "uz-cyrl", "ru", "en"]);
 
+export const moderationTrackEnum = pgEnum("moderation_track", ["general", "top"]);
+
 export const publishStatusEnum = pgEnum("publish_status", [
   "draft",
   "ready_for_publish",
