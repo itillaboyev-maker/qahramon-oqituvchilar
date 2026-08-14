@@ -198,9 +198,14 @@ export function registerPublishQueue(
 
       if (detail.recommendations.length > 0) {
         lines.push("Public content:");
-        for (const { mediaSummary } of detail.recommendations) {
-          lines.push(`- Approved public profile content`);
-          lines.push(`  ?? ${mediaSummary}`);
+        for (const { recommendation: rec, mediaSummary } of detail.recommendations) {
+          if (rec.recommendationText) lines.push(`Nima uchun tavsiya: ${rec.recommendationText}`);
+          if (rec.achievementsText) lines.push(`Yutuqlar: ${rec.achievementsText}`);
+          if (rec.teachingMethodsText) lines.push(`O`+"`"+`qitish metodlari: ${rec.teachingMethodsText}`);
+          if (rec.studentImpactText) lines.push(`Talabalarga ta`+"`"+`sir: ${rec.studentImpactText}`);
+          if (rec.evidenceText) lines.push(`Dalillar: ${rec.evidenceText}`);
+          if (rec.additionalInfo) lines.push(`Qoshimcha: ${rec.additionalInfo}`);
+          lines.push(`Media: ${mediaSummary}`);
           lines.push("");
         }
       }

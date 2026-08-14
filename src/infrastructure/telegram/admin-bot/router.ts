@@ -399,6 +399,26 @@ export function buildAdminBot(
 
     await publishedTeachers.showDetail(ctx, teacherId, Number(pageStr) || 0);  });
 
+  bot.callbackQuery(/^orig_view:(.+):(\d+)$/, async (ctx) => {
+    const [, teacherId] = ctx.match as unknown as [string, string, string];
+    const user = await userRepo.findByTelegramId(ctx.from.id);
+    if (!user) return;
+    (ctx as unknown as { moderatorUserId: string }).moderatorUserId = user.id;
+    const detail = await getTeacherPublishDetail.execute({ teacherId, moderatorUserId: user.id });
+    if (!detail) { await ctx.answerCallbackQuery({ text: "Topilmadi" }); return; }
+    const parts: string[] = ["Original arizalar (tahrirlanmagan):", ""];
+    for (const { recommendation: rec } of detail.recommendations) {
+      if (rec.recommendationText) parts.push(`Nima uchun: ${rec.recommendationText}`);
+      if (rec.achievementsText) parts.push(`Yutuqlar: ${rec.achievementsText}`);
+      if (rec.teachingMethodsText) parts.push(`Metodlar: ${rec.teachingMethodsText}`);
+      if (rec.studentImpactText) parts.push(`Tasir: ${rec.studentImpactText}`);
+      if (rec.evidenceText) parts.push(`Dalillar: ${rec.evidenceText}`);
+      if (rec.additionalInfo) parts.push(`Qoshimcha: ${rec.additionalInfo}`);
+      parts.push("---");
+    }
+    await ctx.reply(parts.join("\n"));
+    await ctx.answerCallbackQuery();
+  });
   bot.callbackQuery("teachers:noop", async (ctx) => {
     await ctx.answerCallbackQuery();
   });
