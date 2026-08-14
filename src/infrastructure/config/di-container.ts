@@ -10,6 +10,7 @@ import { UserRepository } from "../db/repositories/user.repository";
 import { AuditLogRepository } from "../db/repositories/audit-log.repository";
 import { DuplicateCandidateRepository } from "../db/repositories/duplicate-candidate.repository";
 import { PostgresSessionStore } from "../session/postgres-session-store";
+import { AdminInviteRepository } from "../db/repositories/admin-invite.repository";
 
 // Use Cases
 import { FindOrCreateTeacherUseCase } from "../../application/use-cases/teacher/find-or-create-teacher.use-case";
@@ -37,6 +38,7 @@ export interface Container {
     userRepo: UserRepository;
     auditLogRepo: AuditLogRepository;
     duplicateCandidateRepo: DuplicateCandidateRepository;
+    adminInviteRepo: AdminInviteRepository;
   };
   useCases: {
     findOrCreateTeacher: FindOrCreateTeacherUseCase;
@@ -88,6 +90,7 @@ console.log("=======================");
   const userRepo = new UserRepository(db);
   const auditLogRepo = new AuditLogRepository(db);
   const duplicateCandidateRepo = new DuplicateCandidateRepository(db);
+  const adminInviteRepo = new AdminInviteRepository(db);
 
   // Use Cases
   const findOrCreateTeacher = new FindOrCreateTeacherUseCase(
@@ -181,6 +184,7 @@ const listPublishedTeachers = new ListPublishedTeachersUseCase(userRepo, teacher
       userRepo,
       auditLogRepo,
       duplicateCandidateRepo,
+      adminInviteRepo,
     },
     useCases: {
       findOrCreateTeacher,

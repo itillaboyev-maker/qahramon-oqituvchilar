@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import type { Database } from "../client";
 import { users } from "../schema";
 import type {
@@ -36,6 +36,10 @@ export class UserRepository implements UserRepositoryPort {
 
     if (!row) throw new Error("Failed to upsert user");
     return row as User;
+  }
+
+  async setRole(userId: string, role: "user" | "moderator" | "editor" | "admin"): Promise<void> {
+    await this.db.update(users).set({ role, updatedAt: sql`now()` }).where(eq(users.id, userId));
   }
 
   async isModeratorOrAbove(userId: string): Promise<boolean> {

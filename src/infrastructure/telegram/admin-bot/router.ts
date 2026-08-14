@@ -227,6 +227,50 @@ export function buildAdminBot(
     await publishQueue.showQueue(ctx, 0);
   });
 
+  bot.command("invite", async (ctx) => {
+    if (!ctx.from) return;
+    const user = await userRepo.findByTelegramId(ctx.from.id);
+    if (!user || user.role !== "admin") { await ctx.reply("Ruxsat yoq."); return; }
+
+    const args = (ctx.match?.toString().trim() ?? "").split(/\s+/).filter(Boolean);
+    const role = (args[0] as "moderator" | "editor" | "admin") ?? "moderator";
+    const minutes = Number(args[1]) || 60;
+    if (!["moderator", "editor", "admin"].includes(role)) {
+      await ctx.reply("Foydalanish: /invite moderator 60");
+      return;
+    }
+
+    const code = Array.from({ length: 8 }, () => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[Math.floor(Math.random() * 33)]).join("");
+    const expiresAt = new Date(Date.now() + minutes * 60_000);
+    await container.repos.adminInviteRepo.create({ code, role, createdBy: user.id, expiresAt });
+
+    await ctx.reply(
+      `Kod yaratildi: ${code}\nRol: ${role}\nMuddati: ${minutes} daqiqa\n\nBu odam admin botga /redeem ${code} deb yozsin.`,
+    );
+  });
+
+  bot.command("redeem", async (ctx) => {
+    if (!ctx.from) return;
+    const code = (ctx.match?.toString().trim() ?? "").toUpperCase();
+    if (!code) { await ctx.reply("Foydalanish: /redeem KOD"); return; }
+
+    const invite = await container.repos.adminInviteRepo.findByCode(code);
+    if (!invite) { await ctx.reply("Kod topilmadi."); return; }
+    if (invite.usedAt) { await ctx.reply("Kod allaqachon ishlatilgan."); return; }
+    if (invite.expiresAt < new Date()) { await ctx.reply("Kod muddati otgan."); return; }
+
+    const user = await userRepo.upsertByTelegramId({
+      telegramId: ctx.from.id,
+      username: ctx.from.username ?? null,
+      firstName: ctx.from.first_name ?? null,
+      lastName: ctx.from.last_name ?? null,
+    });
+
+    await container.repos.adminInviteRepo.markUsed(invite.id, user.id);
+    await userRepo.setRole(user.id, invite.role);
+
+    await ctx.reply(`Tabriklaymiz! Sizga "${invite.role}" roli berildi. Endi admin bot komandalaridan foydalanishingiz mumkin.`);
+  });
   bot.command("search", async (ctx) => {
     if (!ctx.from) return;
 

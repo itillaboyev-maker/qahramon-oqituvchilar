@@ -9,3 +9,4 @@ export * from "./audit-logs.schema";
 export * from "./bot-sessions.schema";
 export * from "./generated-content.schema";
 export * from "./duplicate-candidates.schema";
+export * from "./admin-invites.schema";
