@@ -29,8 +29,8 @@ export function registerMergeQueue(
 
       await ctx.reply(
         `🔗 Ehtimoliy dublikat (ishonch: ${candidate.similarityScore})\n\n` +
-          `A: <b>${teacherA?.fullName ?? "topilmadi"}</b> (${teacherA?.school ?? "-"})\n` +
-          `B: <b>${teacherB?.fullName ?? "topilmadi"}</b> (${teacherB?.school ?? "-"})`,
+          `A: <b>${teacherA?.fullName ?? "topilmadi"}</b>\n   Maktab: ${teacherA?.school ?? "-"} | Fan: ${teacherA?.subject ?? "-"} | ID: ...${teacherA?.id?.slice(-6) ?? "-"}\n\n` +
+          `B: <b>${teacherB?.fullName ?? "topilmadi"}</b>\n   Maktab: ${teacherB?.school ?? "-"} | Fan: ${teacherB?.subject ?? "-"} | ID: ...${teacherB?.id?.slice(-6) ?? "-"}`,
         { parse_mode: "HTML", reply_markup: kb },
       );
     },
