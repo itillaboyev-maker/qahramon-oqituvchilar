@@ -120,17 +120,17 @@ export function registerPublishQueue(
         logger.error("publish_queue.list_failed", {
           err: err instanceof Error ? err.message : String(err),
         });
-        await safeReply(ctx, "?? Failed to load the publish queue.");
+        await safeReply(ctx, "Xatolik: navbat yuklanmadi.");
         return;
       }
 
       if (result.total === 0) {
-        await safeReply(ctx, "?? Publish queue is empty.");
+        await safeReply(ctx, "Navbat bosh.");
         return;
       }
 
       const lines: string[] = [
-        "?? Publish Queue",
+        "Publish Queue",
         "Review:",
         `${result.total} teachers`,
         "",
@@ -139,22 +139,22 @@ export function registerPublishQueue(
       result.items.forEach((entry, idx) => {
         const num = result.page * result.pageSize + idx + 1;
         lines.push(`${num}.`);
-        lines.push(`?? ${entry.teacher.fullName}`);
-        if (entry.teacher.school) lines.push(`?? ${entry.teacher.school}`);
-        if (entry.teacher.regionName) lines.push(`?? ${entry.teacher.regionName}`);
-        lines.push(`?? ${entry.independentRecommendationCount} recommendations`);
+        lines.push(`Ustoz: ${entry.teacher.fullName}`);
+        if (entry.teacher.school) lines.push(`Maktab: ${entry.teacher.school}`);
+        if (entry.teacher.regionName) lines.push(`Viloyat: ${entry.teacher.regionName}`);
+        lines.push(`Tavsiyalar: ${entry.independentRecommendationCount}`);
         lines.push(`Status: ${entry.teacher.publishStatus}`);
         lines.push("----------------");
       });
 
       const kb = new InlineKeyboard();
       result.items.forEach((entry) => {
-        kb.text("?? Open", `${prefix}:view:${entry.teacher.id}:${result.page}`).row();
+        kb.text("Ochish", `${prefix}:view:${entry.teacher.id}:${result.page}`).row();
       });
 
-      kb.text("?? Previous", `${prefix}:list:${Math.max(0, result.page - 1)}`)
+      kb.text("Oldingi", `${prefix}:list:${Math.max(0, result.page - 1)}`)
         .text(`Page ${result.page + 1}/${result.totalPages}`, "publish:noop")
-        .text("Next ??", `${prefix}:list:${Math.min(result.totalPages - 1, result.page + 1)}`);
+        .text("Keyingi", `${prefix}:list:${Math.min(result.totalPages - 1, result.page + 1)}`);
 
       await safeReply(ctx, lines.join("\n"), { reply_markup: kb });
     },
@@ -171,18 +171,18 @@ export function registerPublishQueue(
           teacherId,
           err: err instanceof Error ? err.message : String(err),
         });
-        await safeReply(ctx, "?? Failed to load teacher profile.");
+        await safeReply(ctx, "Xatolik: profil yuklanmadi.");
         return;
       }
 
       if (!detail) {
-        await safeReply(ctx, "?? Teacher not found.");
+        await safeReply(ctx, "Ustoz topilmadi.");
         return;
       }
 
       const { teacher } = detail;
       const lines: string[] = [
-        `?? ${teacher.fullName}`,
+        `Ustoz: ${teacher.fullName}`,
         `Region: ${teacher.regionName ?? "-"}`,
         `District: ${teacher.districtName ?? "-"}`,
         `School: ${teacher.school ?? "-"}`,
@@ -211,7 +211,7 @@ export function registerPublishQueue(
       }
 
       const kb = new InlineKeyboard()
-        .text("?? Tahrirlash", `edit_teacher:${teacher.id}:${fromPage}`) .text("?? Back", `${prefix}:list:${fromPage}`) .row() .text("? Rad etish", `${prefix}:reject:${teacher.id}`) .text("?? Publish", `${prefix}:confirm:${teacher.id}`).row().text(track === "top" ? "Oddiy navbatga qaytarish" : "TOP navbatiga qoshish", track === "top" ? `assign_general:${teacher.id}:${fromPage}` : `assign_top:${teacher.id}:${fromPage}`);
+        .text("Tahrirlash", `edit_teacher:${teacher.id}:${fromPage}`) .text("Orqaga", `${prefix}:list:${fromPage}`) .row() .text("Rad etish", `${prefix}:reject:${teacher.id}`) .text("Publish", `${prefix}:confirm:${teacher.id}`).row().text(track === "top" ? "Oddiy navbatga qaytarish" : "TOP navbatiga qoshish", track === "top" ? `assign_general:${teacher.id}:${fromPage}` : `assign_top:${teacher.id}:${fromPage}`);
 logger.info("publish_queue.media_debug", {
   teacherId: teacher.id,
   recommendations: detail.recommendations.map((r) => ({
