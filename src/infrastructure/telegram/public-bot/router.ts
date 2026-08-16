@@ -112,7 +112,7 @@ bot.callbackQuery("recommender_phone:skip", async (ctx) => {
   bot.callbackQuery("menu:about", async (ctx) => {
     await ctx.answerCallbackQuery();
     await ctx.reply(
-      "\"Qahramon o'qituvchilar\" — fidoyi o'qituvchilarni tan olish va ularning tajribasini kelajak avlodlar uchun saqlab qolish milliy loyihasi.",
+      "\"Qahramon o'qituvchilar\" — har birimizning hayotimizga iz qoldirgan, ammo ko'pincha e'tiborsiz qolib ketadigan ustozlarni topib, ularning mehnatini butun jamiyat oldida tan olish uchun yaratilgan milliy loyiha.\n\nBiz ishonamizki, har bir muvaffaqiyat ortida — bolalik davridagi bitta ustozning ishonchi, sabri va mehnati turadi. Bu loyiha orqali o'quvchilar, ota-onalar va hamkasblar o'zlarining ustozlarini nomzod sifatida tavsiya etishadi, ularning hayotiga qanday ta'sir ko'rsatganini hikoya qilib berishadi. Har bir tavsiya ekspertlar kuragidan o'tkaziladi, tasdiqlangani esa ochiq bazaga qo'shiladi.\n\nLoyihaning kelajakdagi maqsadi — shu milliy baza asosida barcha tumanlar bo'yicha saralangan, doimiy to'ldirib boriladigan alohida veb-sayt yaratish, unda har bir ustozning hikoyasi, yutug'i va ta'lim falsafasi mustahkam saqlanib qolishi. Bazaga qo'shilish uchun ustoz haqida batafsil ma'lumot yuborish va ekspertlar ko'rigidan o'tish talab etiladi — shu orqali faqat haqiqatan ham munosib, tekshirilgan hikoyalar joy oladi.",
     );
   });
 
