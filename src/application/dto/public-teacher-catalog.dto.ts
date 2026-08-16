@@ -1,8 +1,8 @@
-﻿/**
- * PUBLIC catalog DTOs (Viloyat в†’ Tuman в†’ Ustoz в†’ Profil).
+/**
+ * PUBLIC catalog DTOs (Viloyat → Tuman → Ustoz → Profil).
  *
  * Deliberately separate from TeacherPublishQueueItem / TeacherPublishDetail
- * (moderator-facing types) вЂ” those carry internal/moderation fields that must
+ * (moderator-facing types) — those carry internal/moderation fields that must
  * never reach an unauthenticated public bot user. These DTOs are an explicit
  * allow-list: only fields listed here can ever be sent to the public bot.
  *
@@ -59,5 +59,7 @@ export interface PublicTeacherProfile {
   achievements: string | null;
   educationalPhilosophy: string | null;
   impactStories: string | null;
+  recommendationReasons: string | null;
+  additionalInfo: string | null;
   media: PublicMediaItem[];
 }

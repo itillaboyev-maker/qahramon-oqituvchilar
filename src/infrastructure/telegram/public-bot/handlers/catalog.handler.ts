@@ -147,6 +147,10 @@ export function registerCatalog(
       if (profile.achievements) lines.push(`\n🏆 Yutuqlari:\n${profile.achievements}`);
       if (profile.educationalPhilosophy) lines.push(`\n💡 Ta'lim falsafasi:\n${profile.educationalPhilosophy}`);
       if (profile.impactStories) lines.push(`\n✨ Hikoyalar:\n${profile.impactStories}`);
+      if (profile.recommendationReasons) {
+        lines.push(`\n💬 Nega tavsiya qilinmoqda:\n${profile.recommendationReasons}`);
+      }
+      if (profile.additionalInfo) lines.push(`\n📌 Qo'shimcha ma'lumot:\n${profile.additionalInfo}`);
 
       const kb = new InlineKeyboard().text("⬅️ Viloyatlar", "catalog:regions");
       await safeReply(ctx, lines.join("\n"), { reply_markup: kb });
