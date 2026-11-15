@@ -9,6 +9,7 @@ export interface CreateRecommendationInput {
   relationship?: Recommendation["relationship"];
   submissionType: Recommendation["submissionType"];
   recommendationText?: string | null;
+  experienceYearsText?: string | null;
   achievementsText?: string | null;
   teachingMethodsText?: string | null;
   studentImpactText?: string | null;

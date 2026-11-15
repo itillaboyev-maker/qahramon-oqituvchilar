@@ -47,6 +47,7 @@ export const flowTypeEnum = pgEnum("flow_type", [
   "self_submission",
   "moderation_review",
   "teacher_edit",
+  "admin_input",
 ]);
 
 // Future-ready, not populated by MVP logic:

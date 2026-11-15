@@ -1,4 +1,4 @@
-﻿import { InlineKeyboard } from "grammy";
+import { InlineKeyboard, Keyboard } from "grammy";
 import { t } from "../../../../i18n/translate";
 
 export function mainMenuKeyboard(): InlineKeyboard {
@@ -26,4 +26,13 @@ export function joinChannelKeyboard(channelUsername: string): InlineKeyboard {
   return new InlineKeyboard()
     .url(t("start.btn_join_channel"), channelUrl).row()
     .text(t("start.btn_check_subscription"), "check_subscription");
+}
+
+export function persistentMenuKeyboard(): Keyboard {
+  return new Keyboard()
+    .text(t("menu.submit_info")).row()
+    .text("👨‍🏫 Ustozlar").row()
+    .text(t("menu.about"))
+    .text(t("menu.contact"))
+    .resized();
 }

@@ -36,7 +36,8 @@ school: string;
   teacherPhone?: string | null;
 
   // extended / optional — only present if the user added more
-  subject?: string;
+   subject?: string;
+  experienceYearsText?: string;
   achievementsText?: string;
   teachingMethodsText?: string;
   studentImpactText?: string;

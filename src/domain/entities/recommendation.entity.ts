@@ -9,7 +9,8 @@ export interface Recommendation {
   teacherPhone: string | null; // optional public-flow teacher phone, stored as a recommendation contact when provided
   relationship: Relationship | null;
   submissionType: SubmissionType;
-  recommendationText: string | null;
+   recommendationText: string | null;
+  experienceYearsText: string | null;
   achievementsText: string | null;
   teachingMethodsText: string | null;
   studentImpactText: string | null;

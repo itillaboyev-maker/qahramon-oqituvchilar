@@ -10,6 +10,9 @@ compatibility_flags = ["nodejs_compat"]
 #   PUBLIC_BOT_WEBHOOK_SECRET
 #   ADMIN_BOT_WEBHOOK_SECRET
 #   REQUIRED_CHANNEL_ID    - e.g. "@qahramon_oqituvchilar"
+#   SUPPORT_BOT_TOKEN       - Telegram token for the support-forwarder bot
+#   SUPPORT_BOT_WEBHOOK_SECRET
+#   SUPPORT_ADMIN_CHAT_ID   - your personal Telegram numeric user ID
 
 [vars]
 ENVIRONMENT = "production"

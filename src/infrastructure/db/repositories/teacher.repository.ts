@@ -1,6 +1,6 @@
-import { eq, and, or, ilike, sql, asc, count, gte } from "drizzle-orm";
+import { eq, and, or, ilike, sql, asc, count, gte, lte, inArray, between } from "drizzle-orm";
 import type { Database } from "../client";
-import { teachers, regions, districts } from "../schema";
+import { teachers, regions, districts, recommendations } from "../schema";
 import type {
   TeacherRepositoryPort,
   CandidatePrefilterInput,
@@ -9,6 +9,7 @@ import type {
   RegionWithPublishedCount,
   DistrictWithPublishedCount,
   PublishedTeachersPage,
+  PublishedTeacherFilters,
 } from "../../../application/ports/repositories/teacher.repository.port";
 import type { Teacher, NewTeacherInput } from "../../../domain/entities/teacher.entity";
 import { IDENTITY_RESOLUTION } from "../../../shared/constants/identity-resolution.constants";
@@ -156,11 +157,51 @@ export class TeacherRepository implements TeacherRepositoryPort {
     };
   }
 
+    private async teacherIdsByApplicationDateRange(from: Date, to: Date): Promise<string[]> {
+    const rows = await this.db
+      .selectDistinct({ teacherId: recommendations.teacherId })
+      .from(recommendations)
+      .where(between(recommendations.createdAt, from, to));
+    return rows.map((r) => r.teacherId);
+  }
+
+  private async buildPublishedFilterConditions(
+    status: Teacher["publishStatus"],
+    filters?: PublishedTeacherFilters,
+  ) {
+    const conditions = [eq(teachers.publishStatus, status)];
+
+    if (filters?.districtNameQuery) {
+      conditions.push(ilike(districts.nameUzLatn, `%${filters.districtNameQuery}%`));
+    }
+    if (filters?.subject) {
+      conditions.push(eq(teachers.subject, filters.subject));
+    }
+    if (filters?.minExperience !== undefined) {
+      conditions.push(gte(teachers.yearsOfExperience, filters.minExperience));
+    }
+    if (filters?.maxExperience !== undefined) {
+      conditions.push(lte(teachers.yearsOfExperience, filters.maxExperience));
+    }
+    if (filters?.applicationDateFrom && filters?.applicationDateTo) {
+      const ids = await this.teacherIdsByApplicationDateRange(
+        filters.applicationDateFrom,
+        filters.applicationDateTo,
+      );
+      conditions.push(inArray(teachers.id, ids.length > 0 ? ids : ["00000000-0000-0000-0000-000000000000"]));
+    }
+
+    return and(...conditions);
+  }
+
   async listPublishQueue(
     status: Teacher["publishStatus"],
     limit: number,
     offset: number,
+    filters?: PublishedTeacherFilters,
   ): Promise<TeacherPublishQueueItem[]> {
+    const where = await this.buildPublishedFilterConditions(status, filters);
+
     const rows = await this.db
       .select({
         teacher: teachers,
@@ -170,7 +211,7 @@ export class TeacherRepository implements TeacherRepositoryPort {
       .from(teachers)
       .leftJoin(regions, eq(teachers.regionId, regions.id))
       .leftJoin(districts, eq(teachers.districtId, districts.id))
-      .where(eq(teachers.publishStatus, status))
+      .where(where)
       .orderBy(asc(teachers.createdAt))
       .limit(limit)
       .offset(offset);
@@ -178,12 +219,178 @@ export class TeacherRepository implements TeacherRepositoryPort {
     return rows.map((row) => this.toPublishQueueItem(row));
   }
 
-  async countByPublishStatus(status: Teacher["publishStatus"]): Promise<number> {
+  async countByPublishStatus(
+    status: Teacher["publishStatus"],
+    filters?: PublishedTeacherFilters,
+  ): Promise<number> {
+    const where = await this.buildPublishedFilterConditions(status, filters);
+
     const [row] = await this.db
       .select({ value: count() })
       .from(teachers)
-      .where(eq(teachers.publishStatus, status));
+      .leftJoin(districts, eq(teachers.districtId, districts.id))
+      .where(where);
     return row?.value ?? 0;
+  }
+
+  async listDistinctPublishedSubjects(): Promise<string[]> {
+    const rows = await this.db
+      .selectDistinct({ subject: teachers.subject })
+      .from(teachers)
+      .where(and(eq(teachers.publishStatus, "published"), sql`${teachers.subject} is not null`))
+      .orderBy(asc(teachers.subject));
+    return rows.map((r) => r.subject).filter((s): s is string => Boolean(s));
+  }
+
+    private pendingChannelPostWhere(sinceIso: string) {
+    return and(
+      eq(teachers.publishStatus, "published"),
+      sql`${teachers.channelPostedAt} is null`,
+      sql`${teachers.id} in (select entity_id from audit_logs where action = 'teacher.published' and created_at >= ${sinceIso}::timestamptz)`,
+    );
+  }
+
+  async countPendingChannelPosts(sinceIso: string): Promise<number> {
+    const [row] = await this.db
+      .select({ value: count() })
+      .from(teachers)
+      .where(this.pendingChannelPostWhere(sinceIso));
+    return row?.value ?? 0;
+  }
+
+  async listPendingChannelPostIds(sinceIso: string, limit: number): Promise<string[]> {
+    const rows = await this.db
+      .select({ id: teachers.id })
+      .from(teachers)
+      .where(this.pendingChannelPostWhere(sinceIso))
+      .orderBy(asc(teachers.createdAt))
+      .limit(limit);
+    return rows.map((r) => r.id);
+  }
+
+  private firstRowOf(result: unknown): Record<string, unknown> {
+    const arr = Array.isArray(result) ? result : ((result as { rows?: unknown[] } | null)?.rows ?? []);
+    return (arr[0] ?? {}) as Record<string, unknown>;
+  }
+
+  async countForCleanup(sinceIso: string): Promise<number> {
+    const [row] = await this.db
+      .select({ value: count() })
+      .from(teachers)
+      .where(sql`${teachers.createdAt} >= ${sinceIso}::timestamptz`);
+    return row?.value ?? 0;
+  }
+
+  async listForCleanup(sinceIso: string, limit: number, offset: number) {
+    return this.db
+      .select({
+        id: teachers.id,
+        fullName: teachers.fullName,
+        publishStatus: teachers.publishStatus,
+        createdAt: teachers.createdAt,
+        subject: teachers.subject,
+        channelPostedAt: teachers.channelPostedAt,
+      })
+      .from(teachers)
+      .where(sql`${teachers.createdAt} >= ${sinceIso}::timestamptz`)
+      .orderBy(sql`${teachers.createdAt} desc`)
+      .limit(limit)
+      .offset(offset);
+  }
+
+  async findCleanupItem(id: string) {
+    const [row] = await this.db
+      .select({
+        id: teachers.id,
+        fullName: teachers.fullName,
+        publishStatus: teachers.publishStatus,
+        createdAt: teachers.createdAt,
+        subject: teachers.subject,
+        channelPostedAt: teachers.channelPostedAt,
+      })
+      .from(teachers)
+      .where(eq(teachers.id, id))
+      .limit(1);
+    return row ?? null;
+  }
+
+  async countTeacherDependents(id: string): Promise<{ recommendations: number; media: number }> {
+    const result = await this.db.execute(sql`
+      select
+        (select count(*) from recommendations where teacher_id = ${id}::uuid) as recommendations,
+        (select count(*) from media where recommendation_id in (select id from recommendations where teacher_id = ${id}::uuid)) as media
+    `);
+    const row = this.firstRowOf(result);
+    return { recommendations: Number(row.recommendations ?? 0), media: Number(row.media ?? 0) };
+  }
+
+  async deleteTeacherCascade(
+    id: string,
+  ): Promise<{ teachers: number; recommendations: number; media: number; duplicates: number }> {
+    const result = await this.db.execute(sql`
+      with r as (select id from recommendations where teacher_id = ${id}::uuid),
+      m as (delete from media where recommendation_id in (select id from r) returning 1),
+      rc as (delete from recommendations where id in (select id from r) returning 1),
+      g as (delete from generated_content where teacher_id = ${id}::uuid returning 1),
+      d as (delete from duplicate_candidates where teacher_id_a = ${id}::uuid or teacher_id_b = ${id}::uuid returning 1),
+      x as (delete from teachers where id = ${id}::uuid returning 1)
+      select
+        (select count(*) from x) as teachers,
+        (select count(*) from rc) as recommendations,
+        (select count(*) from m) as media,
+        (select count(*) from d) as duplicates
+    `);
+    const row = this.firstRowOf(result);
+    return {
+      teachers: Number(row.teachers ?? 0),
+      recommendations: Number(row.recommendations ?? 0),
+      media: Number(row.media ?? 0),
+      duplicates: Number(row.duplicates ?? 0),
+    };
+  }
+
+  async markChannelPosted(id: string): Promise<void> {
+    await this.db.update(teachers).set({ channelPostedAt: new Date() }).where(eq(teachers.id, id));
+  }
+
+  async updateYearsOfExperience(id: string, years: number): Promise<Teacher> {
+    const [row] = await this.db
+      .update(teachers)
+      .set({ yearsOfExperience: years })
+      .where(eq(teachers.id, id))
+      .returning();
+    if (!row) throw new Error("Teacher not found");
+    return row as Teacher;
+  }
+
+  async updateAchievements(id: string, achievements: string): Promise<Teacher> {
+    const [row] = await this.db
+      .update(teachers)
+      .set({ achievements })
+      .where(eq(teachers.id, id))
+      .returning();
+    if (!row) throw new Error("Teacher not found");
+    return row as Teacher;
+  }
+
+  async updateEducationalPhilosophy(id: string, educationalPhilosophy: string): Promise<Teacher> {
+    const [row] = await this.db
+      .update(teachers)
+      .set({ educationalPhilosophy })
+      .where(eq(teachers.id, id))
+      .returning();
+    if (!row) throw new Error("Teacher not found");
+    return row as Teacher;
+  }
+
+  async updateImpactStories(id: string, impactStories: string): Promise<Teacher> {
+    const [row] = await this.db
+      .update(teachers)
+      .set({ impactStories })
+      .where(eq(teachers.id, id))
+      .returning();
+    if (!row) throw new Error("Teacher not found");
+    return row as Teacher;
   }
 
   async findPublishQueueDetailById(id: string): Promise<TeacherPublishQueueItem | null> {

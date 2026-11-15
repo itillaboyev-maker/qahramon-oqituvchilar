@@ -35,6 +35,14 @@ export function buildAdminBot(
     console.log("ADMIN BOT ID:", bot.botInfo.id);
   });
 
+  bot.use(async (ctx, next) => {
+    if (ctx.from) {
+      const found = await userRepo.findByTelegramId(ctx.from.id);
+      if (found) (ctx as unknown as { moderatorUserId?: string }).moderatorUserId = found.id;
+    }
+    await next();
+  });
+
   bot.command("test", async (ctx) => {
     await ctx.reply("TEST OK");
   });
@@ -58,11 +66,13 @@ export function buildAdminBot(
     listPublishedTeachers,
   } = container.useCases;
 
-  const publishedTeachers = registerPublishedTeachers(
+    const publishedTeachers = registerPublishedTeachers(
     listPublishedTeachers,
     getTeacherPublishDetail,
     container.repos.mediaRepo,
     env,
+    container.sessionStore,
+    teacherRepo,
   );
 
   bot.catch((err) => {
@@ -392,12 +402,7 @@ export function buildAdminBot(
     await publishQueue.startEdit(ctx, teacherId, Number(pageStr) || 0);
   });
 
-  bot.on("message:text", async (ctx) => {
-    const user = await userRepo.findByTelegramId(ctx.from!.id);
-    if (!user) return;
-    (ctx as unknown as { moderatorUserId: string }).moderatorUserId = user.id;
-    await publishQueue.handleEditText(ctx, ctx.message.text);
-  });
+  
 
   bot.callbackQuery(/^publish:reject:(.+)$/, async (ctx) => {
     const [, teacherId] = ctx.match as unknown as [string, string];
@@ -420,6 +425,66 @@ export function buildAdminBot(
     (ctx as unknown as { moderatorUserId: string }).moderatorUserId = user.id;
 
     await publishQueue.handlePublish(ctx, teacherId);
+  });
+
+  bot.callbackQuery(/^teachers:pending:(\d+)$/, async (ctx) => {
+    await ctx.answerCallbackQuery().catch(() => {});
+    const [, pageStr] = ctx.match as unknown as [string, string];
+
+    const user = await userRepo.findByTelegramId(ctx.from.id);
+    if (!user) return;
+
+    (ctx as unknown as { moderatorUserId: string }).moderatorUserId = user.id;
+
+    await publishedTeachers.showPendingList(ctx, Number(pageStr) || 0);
+  });
+
+  bot.callbackQuery(/^teachers:pview:(.+):(\d+)$/, async (ctx) => {
+    await ctx.answerCallbackQuery().catch(() => {});
+    const [, teacherId, pageStr] = ctx.match as unknown as [string, string, string];
+
+    const user = await userRepo.findByTelegramId(ctx.from.id);
+    if (!user) return;
+
+    (ctx as unknown as { moderatorUserId: string }).moderatorUserId = user.id;
+
+    await publishedTeachers.showDetail(ctx, teacherId, Number(pageStr) || 0, "pending");
+  });
+
+  bot.callbackQuery(/^teachers:clean:(\d+)$/, async (ctx) => {
+    await ctx.answerCallbackQuery().catch(() => {});
+    const [, pageStr] = ctx.match as unknown as [string, string];
+
+    const user = await userRepo.findByTelegramId(ctx.from.id);
+    if (!user) return;
+
+    (ctx as unknown as { moderatorUserId: string }).moderatorUserId = user.id;
+
+    await publishedTeachers.showCleanupList(ctx, Number(pageStr) || 0);
+  });
+
+  bot.callbackQuery(/^teachers:cdel:(.+):(\d+)$/, async (ctx) => {
+    await ctx.answerCallbackQuery().catch(() => {});
+    const [, teacherId, pageStr] = ctx.match as unknown as [string, string, string];
+
+    const user = await userRepo.findByTelegramId(ctx.from.id);
+    if (!user) return;
+
+    (ctx as unknown as { moderatorUserId: string }).moderatorUserId = user.id;
+
+    await publishedTeachers.showCleanupConfirm(ctx, teacherId, Number(pageStr) || 0);
+  });
+
+  bot.callbackQuery(/^teachers:cdo:(.+):(\d+)$/, async (ctx) => {
+    await ctx.answerCallbackQuery().catch(() => {});
+    const [, teacherId, pageStr] = ctx.match as unknown as [string, string, string];
+
+    const user = await userRepo.findByTelegramId(ctx.from.id);
+    if (!user) return;
+
+    (ctx as unknown as { moderatorUserId: string }).moderatorUserId = user.id;
+
+    await publishedTeachers.doCleanupDelete(ctx, teacherId, Number(pageStr) || 0);
   });
 
   bot.callbackQuery(/^teachers:list:(\d+)$/, async (ctx) => {
@@ -463,9 +528,119 @@ export function buildAdminBot(
     await ctx.reply(parts.join("\n"));
     await ctx.answerCallbackQuery();
   });
-  bot.callbackQuery("teachers:noop", async (ctx) => {
+    bot.callbackQuery("teachers:noop", async (ctx) => {
     await ctx.answerCallbackQuery();
   });
 
+  bot.callbackQuery(/^chpost:preview:(.+)$/, async (ctx) => {
+    if (!ctx.from) return;
+    const [, teacherId] = ctx.match as unknown as [string, string];
+    const user = await userRepo.findByTelegramId(ctx.from.id);
+    if (!user) return;
+    await publishedTeachers.channelPreview(ctx, user.id, teacherId);
+  });
+
+  bot.callbackQuery("chpost:send", async (ctx) => {
+    if (!ctx.from) return;
+    const user = await userRepo.findByTelegramId(ctx.from.id);
+    if (!user) return;
+    await publishedTeachers.channelSend(ctx, user.id);
+  });
+
+  bot.callbackQuery("chpost:edit", async (ctx) => {
+    if (!ctx.from) return;
+    const user = await userRepo.findByTelegramId(ctx.from.id);
+    if (!user) return;
+    await publishedTeachers.channelEdit(ctx, user.id);
+  });
+
+  bot.callbackQuery("chpost:cancel", async (ctx) => {
+    if (!ctx.from) return;
+    const user = await userRepo.findByTelegramId(ctx.from.id);
+    if (!user) return;
+    await publishedTeachers.channelCancel(ctx, user.id);
+  });
+
+  bot.command("channel_backfill", async (ctx) => {
+    await publishedTeachers.channelBackfillStatus(ctx);
+  });
+
+  bot.callbackQuery("chbackfill:run", async (ctx) => {
+    await publishedTeachers.channelBackfillRun(ctx);
+  });
+
+  bot.callbackQuery("teachers:filter:menu", async (ctx) => {
+    await publishedTeachers.showFilterMenu(ctx);
+  });
+
+   bot.callbackQuery("teachers:filter:back", async (ctx) => {
+    await ctx.answerCallbackQuery();
+    if (!ctx.from) return;
+    const user = await userRepo.findByTelegramId(ctx.from.id);
+    if (!user) return;
+    (ctx as unknown as { moderatorUserId: string }).moderatorUserId = user.id;
+    await publishedTeachers.showList(ctx, 0);
+  });
+
+  bot.callbackQuery("teachers:filter:date", async (ctx) => {
+    if (!ctx.from) return;
+    const user = await userRepo.findByTelegramId(ctx.from.id);
+    if (!user) return;
+    (ctx as unknown as { moderatorUserId: string }).moderatorUserId = user.id;
+    await publishedTeachers.promptDate(ctx, user.id);
+  });
+
+  bot.callbackQuery("teachers:filter:district", async (ctx) => {
+    if (!ctx.from) return;
+    const user = await userRepo.findByTelegramId(ctx.from.id);
+    if (!user) return;
+    (ctx as unknown as { moderatorUserId: string }).moderatorUserId = user.id;
+    await publishedTeachers.promptDistrict(ctx, user.id);
+  });
+
+  bot.callbackQuery("teachers:filter:experience", async (ctx) => {
+    if (!ctx.from) return;
+    const user = await userRepo.findByTelegramId(ctx.from.id);
+    if (!user) return;
+    (ctx as unknown as { moderatorUserId: string }).moderatorUserId = user.id;
+    await publishedTeachers.promptExperience(ctx, user.id);
+  });
+
+  bot.callbackQuery("teachers:filter:subject", async (ctx) => {
+    if (!ctx.from) return;
+    const user = await userRepo.findByTelegramId(ctx.from.id);
+    if (!user) return;
+    (ctx as unknown as { moderatorUserId: string }).moderatorUserId = user.id;
+    await publishedTeachers.showSubjectOptions(ctx, user.id);
+  });
+
+  bot.callbackQuery(/^teachers:filter:subject:(\d+)$/, async (ctx) => {
+    if (!ctx.from) return;
+    const [, indexStr] = ctx.match as unknown as [string, string];
+    const user = await userRepo.findByTelegramId(ctx.from.id);
+    if (!user) return;
+    (ctx as unknown as { moderatorUserId: string }).moderatorUserId = user.id;
+    await publishedTeachers.applySubjectChoice(ctx, user.id, Number(indexStr));
+  });
+
+  bot.callbackQuery("teachers:filter:clear", async (ctx) => {
+    if (!ctx.from) return;
+    const user = await userRepo.findByTelegramId(ctx.from.id);
+    if (!user) return;
+    (ctx as unknown as { moderatorUserId: string }).moderatorUserId = user.id;
+    await publishedTeachers.clearFilters(ctx, user.id);
+  });
+     bot.on("message:text", async (ctx) => {
+    if (!ctx.from) return;
+    const text = ctx.message.text;
+
+    const user = await userRepo.findByTelegramId(ctx.from.id);
+    if (!user) return;
+    (ctx as unknown as { moderatorUserId: string }).moderatorUserId = user.id;
+
+    if (await publishQueue.handleEditText(ctx, text)) return;
+    if (await publishQueue.handlePublishExperienceText(ctx, user.id, text)) return;
+    if (await publishedTeachers.handleFilterText(ctx, user.id, text)) return;
+  });
   return bot;
 }

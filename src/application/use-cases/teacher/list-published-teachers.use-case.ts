@@ -1,10 +1,15 @@
-import type { TeacherRepositoryPort, TeacherPublishQueueItem } from "../../ports/repositories/teacher.repository.port";
+import type {
+  TeacherRepositoryPort,
+  TeacherPublishQueueItem,
+  PublishedTeacherFilters,
+} from "../../ports/repositories/teacher.repository.port";
 import type { UserRepositoryPort } from "../../ports/repositories/user.repository.port";
 import { UnauthorizedActionError } from "../../../domain/errors/domain-errors";
 
 export interface ListPublishedTeachersInput {
   moderatorUserId: string;
   page: number;
+  filters?: PublishedTeacherFilters;
 }
 
 export interface ListPublishedTeachersResult {
@@ -32,9 +37,9 @@ export class ListPublishedTeachersUseCase {
     const page = Math.max(0, input.page);
     const offset = page * PAGE_SIZE;
 
-    const [teachers, total] = await Promise.all([
-      this.teacherRepo.listPublishQueue("published", PAGE_SIZE, offset),
-      this.teacherRepo.countByPublishStatus("published"),
+        const [teachers, total] = await Promise.all([
+      this.teacherRepo.listPublishQueue("published", PAGE_SIZE, offset, input.filters),
+      this.teacherRepo.countByPublishStatus("published", input.filters),
     ]);
 
     const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));

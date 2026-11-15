@@ -19,12 +19,13 @@ export class RecommendationRepository implements RecommendationRepositoryPort {
 
         status: "new",
 
-        recommenderName: input.recommenderName ?? null,
+               recommenderName: input.recommenderName ?? null,
         recommenderPhone: input.recommenderPhone ?? null,
         teacherPhone: input.teacherPhone ?? null,
         relationship: input.relationship ?? null,
         submissionType: input.submissionType,
         recommendationText: input.recommendationText ?? null,
+        experienceYearsText: input.experienceYearsText ?? null,
         achievementsText: input.achievementsText ?? null,
         teachingMethodsText: input.teachingMethodsText ?? null,
         studentImpactText: input.studentImpactText ?? null,
@@ -35,7 +36,7 @@ export class RecommendationRepository implements RecommendationRepositoryPort {
       })
       .returning();
 
-    if (!row) throw new Error("Failed to create recommendation");
+        if (!row) throw new Error("Failed to create recommendation");
     return row as Recommendation;
   }
 

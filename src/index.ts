@@ -2,6 +2,7 @@ import { webhookCallback } from "grammy";
 import { buildContainer } from "./infrastructure/config/di-container";
 import { buildPublicBot } from "./infrastructure/telegram/public-bot/router";
 import { buildAdminBot } from "./infrastructure/telegram/admin-bot/router";
+import { buildSupportBot } from "./infrastructure/telegram/support-bot/router";
 import { logger } from "./infrastructure/logging/logger";
 import type { Env } from "./infrastructure/config/env";
 
@@ -23,7 +24,7 @@ export default {
       }
 
 if (url.pathname === "/webhook/admin") {
-  console.log("🔥 ADMIN WEBHOOK HIT");
+  console.log("рџ”Ґ ADMIN WEBHOOK HIT");
 
   if (
     request.headers.get("x-telegram-bot-api-secret-token") !==
@@ -38,7 +39,7 @@ if (url.pathname === "/webhook/admin") {
     });
   }
 
-  console.log("🔥 BUILDING ADMIN BOT");
+  console.log("рџ”Ґ BUILDING ADMIN BOT");
 
   const bot = buildAdminBot(
     env.ADMIN_BOT_TOKEN,
@@ -46,7 +47,7 @@ if (url.pathname === "/webhook/admin") {
     env,
   );
 
-  console.log("🔥 ADMIN BOT BUILT");
+  console.log("рџ”Ґ ADMIN BOT BUILT");
 
   logger.info("before_webhook_callback");
 
@@ -60,15 +61,28 @@ if (url.pathname === "/webhook/admin") {
   });
 
   console.log(
-    "🔥 WEBHOOK FINISHED",
+    "рџ”Ґ WEBHOOK FINISHED",
     response.status,
   );
 
   return response;
 }
 
+if (url.pathname === "/webhook/support") {
+  if (
+    request.headers.get("x-telegram-bot-api-secret-token") !==
+    env.SUPPORT_BOT_WEBHOOK_SECRET
+  ) {
+    logger.warn("support_webhook_auth_failed", { path: url.pathname });
+    return new Response("Unauthorized", { status: 401 });
+  }
+
+  const supportBot = buildSupportBot(env.SUPPORT_BOT_TOKEN, env.SUPPORT_ADMIN_CHAT_ID);
+  return await webhookCallback(supportBot, "cloudflare-mod")(request);
+}
+
 return new Response(
-  "Qahramon O'qituvchilar API — see /webhook/public and /webhook/admin",
+  "Qahramon Ustozlar API вЂ” see /webhook/public and /webhook/admin",
   {
     status: 200,
   },

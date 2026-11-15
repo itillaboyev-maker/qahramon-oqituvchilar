@@ -20,6 +20,15 @@ export interface TeacherPublishQueueItem extends Teacher {
   districtName: string | null;
 }
 
+export interface PublishedTeacherFilters {
+  districtNameQuery?: string;
+  subject?: string;
+  minExperience?: number;
+  maxExperience?: number;
+  applicationDateFrom?: Date;
+  applicationDateTo?: Date;
+}
+
 /** Public catalog read models (business rule: published-only, no internal fields). */
 export interface RegionWithPublishedCount {
   id: string;
@@ -58,12 +67,15 @@ export interface TeacherRepositoryPort {
   findCandidatesByNameSimilarity(input: CandidatePrefilterInput): Promise<Teacher[]>;
   create(input: NewTeacherInput): Promise<Teacher>;
   updatePublishStatus(id: string, status: Teacher["publishStatus"]): Promise<Teacher>;
-  /** TOP moderation track � separate editorial queue, exclusive with "general". */
+  /** TOP moderation track � separate editorial queue, exclusive with "general". */
   updateModerationTrack(id: string, track: Teacher["moderationTrack"]): Promise<Teacher>;
   listPublishQueueByTrack(status: Teacher["publishStatus"], track: Teacher["moderationTrack"], limit: number, offset: number): Promise<TeacherPublishQueueItem[]>;
   countByPublishStatusAndTrack(status: Teacher["publishStatus"], track: Teacher["moderationTrack"]): Promise<number>;
   /** Moderator-edited public story text, applied before publish. */
   updateBiography(id: string, biography: string): Promise<Teacher>;
+  updateAchievements(id: string, achievements: string): Promise<Teacher>;
+  updateEducationalPhilosophy(id: string, educationalPhilosophy: string): Promise<Teacher>;
+  updateImpactStories(id: string, impactStories: string): Promise<Teacher>;
   /**
    * Merge workflow (business rule F): marks the LOSING profile as archived and points
    * it at the winner. Never deletes the row — every field on the loser stays queryable
@@ -82,15 +94,38 @@ export interface TeacherRepositoryPort {
    * search() — search() is unordered/filter-driven and moderator-facing;
    * this is a stable, ordered queue with denormalized region/district names.
    */
-  listPublishQueue(
+    listPublishQueue(
     status: Teacher["publishStatus"],
     limit: number,
     offset: number,
+    filters?: PublishedTeacherFilters,
   ): Promise<TeacherPublishQueueItem[]>;
   /** Total teachers at a given publishStatus — powers total/totalPages for the publish queue. */
-  countByPublishStatus(status: Teacher["publishStatus"]): Promise<number>;
+    countByPublishStatus(
+    status: Teacher["publishStatus"],
+    filters?: PublishedTeacherFilters,
+  ): Promise<number>;
   /** Single-teacher detail lookup for the publish queue's "Open" screen, with region/district names joined in. */
-  findPublishQueueDetailById(id: string): Promise<TeacherPublishQueueItem | null>;
+    findPublishQueueDetailById(id: string): Promise<TeacherPublishQueueItem | null>;
+  listDistinctPublishedSubjects(): Promise<string[]>;
+  updateYearsOfExperience(id: string, years: number): Promise<Teacher>;
+  /** Published teachers (audit "teacher.published" since the given ISO time) not yet posted to the channel. */
+  countPendingChannelPosts(sinceIso: string): Promise<number>;
+  listPendingChannelPostIds(sinceIso: string, limit: number): Promise<string[]>;
+  markChannelPosted(id: string): Promise<void>;
+  countForCleanup(sinceIso: string): Promise<number>;
+  listForCleanup(
+    sinceIso: string,
+    limit: number,
+    offset: number,
+  ): Promise<Array<{ id: string; fullName: string; publishStatus: string; createdAt: Date | string; subject: string | null; channelPostedAt: Date | string | null }>>;
+  findCleanupItem(
+    id: string,
+  ): Promise<{ id: string; fullName: string; publishStatus: string; createdAt: Date | string; subject: string | null; channelPostedAt: Date | string | null } | null>;
+  countTeacherDependents(id: string): Promise<{ recommendations: number; media: number }>;
+  deleteTeacherCascade(
+    id: string,
+  ): Promise<{ teachers: number; recommendations: number; media: number; duplicates: number }>;
 
   /**
    * PUBLIC catalog (Viloyat → Tuman → Ustoz → Profil). Only regions/districts that

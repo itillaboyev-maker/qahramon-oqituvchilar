@@ -1,4 +1,4 @@
-﻿import { Bot, InlineKeyboard } from "grammy";
+import { Bot, InlineKeyboard } from "grammy";
 import type { Container } from "../../config/di-container";
 import type { Env } from "../../config/env";
 import { subscriptionGuard } from "./middleware/subscription-guard.middleware";
@@ -52,14 +52,14 @@ export function buildPublicBot(botToken: string, requiredChannelId: string, cont
   );
   const catalog = registerCatalog(getPublicTeacherCatalog, getPublicTeacherProfile, env);
 
-   bot.command("start", startHandler(registerUser));
+    bot.use(subscriptionGuard(publicTelegramClient, requiredChannelId));
+
+  bot.command("start", startHandler(registerUser));
 
   bot.callbackQuery(
     "check_subscription",
     checkSubscriptionHandler(publicTelegramClient, requiredChannelId),
   );
-
-  bot.use(subscriptionGuard(publicTelegramClient, requiredChannelId));
   // Business rule A: always ask "who is this about" before any submission starts.
   // "Boshqa ustoz" is the encouraged default — emphasized in the keyboard itself
   // (see whoIsThisAboutKeyboard), not by skipping the question.
@@ -112,13 +112,25 @@ bot.callbackQuery("recommender_phone:skip", async (ctx) => {
   bot.callbackQuery("menu:about", async (ctx) => {
     await ctx.answerCallbackQuery();
     await ctx.reply(
-      "\"Qahramon o'qituvchilar\" — har birimizning hayotimizga iz qoldirgan, ammo ko'pincha e'tiborsiz qolib ketadigan ustozlarni topib, ularning mehnatini butun jamiyat oldida tan olish uchun yaratilgan milliy loyiha.\n\nBiz ishonamizki, har bir muvaffaqiyat ortida — bolalik davridagi bitta ustozning ishonchi, sabri va mehnati turadi. Bu loyiha orqali o'quvchilar, ota-onalar va hamkasblar o'zlarining ustozlarini nomzod sifatida tavsiya etishadi, ularning hayotiga qanday ta'sir ko'rsatganini hikoya qilib berishadi. Har bir tavsiya ekspertlar kuragidan o'tkaziladi, tasdiqlangani esa ochiq bazaga qo'shiladi.\n\nLoyihaning kelajakdagi maqsadi — shu milliy baza asosida barcha tumanlar bo'yicha saralangan, doimiy to'ldirib boriladigan alohida veb-sayt yaratish, unda har bir ustozning hikoyasi, yutug'i va ta'lim falsafasi mustahkam saqlanib qolishi. Bazaga qo'shilish uchun ustoz haqida batafsil ma'lumot yuborish va ekspertlar ko'rigidan o'tish talab etiladi — shu orqali faqat haqiqatan ham munosib, tekshirilgan hikoyalar joy oladi.",
+      "\"Fidoyi ustozlar\" — har birimizning hayotimizga iz qoldirgan, ammo ko'pincha e'tiborsiz qolib ketadigan ustozlarni topib, ularning mehnatini butun jamiyat oldida tan olish uchun yaratilgan milliy loyiha.\n\nBiz ishonamizki, har bir muvaffaqiyat ortida — bolalik davridagi bitta ustozning ishonchi, sabri va mehnati turadi. Bu loyiha orqali o'quvchilar, ota-onalar va hamkasblar o'zlarining ustozlarini nomzod sifatida tavsiya etishadi, ularning hayotiga qanday ta'sir ko'rsatganini hikoya qilib berishadi. Har bir tavsiya ekspertlar kuragidan o'tkaziladi, tasdiqlangani esa ochiq bazaga qo'shiladi.\n\nLoyihaning kelajakdagi maqsadi — shu milliy baza asosida barcha tumanlar bo'yicha saralangan, doimiy to'ldirib boriladigan alohida veb-sayt yaratish, unda har bir ustozning hikoyasi, yutug'i va ta'lim falsafasi mustahkam saqlanib qolishi. Bazaga qo'shilish uchun ustoz haqida batafsil ma'lumot yuborish va ekspertlar ko'rigidan o'tish talab etiladi — shu orqali faqat haqiqatan ham munosib, tekshirilgan hikoyalar joy oladi.",
     );
   });
 
   bot.callbackQuery("menu:contact", async (ctx) => {
     await ctx.answerCallbackQuery();
-    await ctx.reply("Savol va takliflar uchun: @qahramon_oqituvchilar_support");
+    await ctx.reply("Savol va takliflar uchun: @Fidoyi_support_bot");
+  });
+
+  bot.hears(t("menu.submit_info"), async (ctx) => {
+    await ctx.reply(t("who.question"), { reply_markup: whoIsThisAboutKeyboard() });
+  });
+
+  bot.hears(t("menu.about"), async (ctx) => {
+    await ctx.reply("\"Fidoyi ustozlar\" — har birimizning hayotimizga iz qoldirgan, ammo ko'pincha e'tiborsiz qolib ketadigan ustozlarni topib, ularning mehnatini butun jamiyat oldida tan olish uchun yaratilgan milliy loyiha.\n\nBiz ishonamizki, har bir muvaffaqiyat ortida — bolalik davridagi bitta ustozning ishonchi, sabri va mehnati turadi. Bu loyiha orqali o'quvchilar, ota-onalar va hamkasblar o'zlarining ustozlarini nomzod sifatida tavsiya etishadi, ularning hayotiga qanday ta'sir ko'rsatganini hikoya qilib berishadi. Har bir tavsiya ekspertlar kuragidan o'tkaziladi, tasdiqlangani esa ochiq bazaga qo'shiladi.\n\nLoyihaning kelajakdagi maqsadi — shu milliy baza asosida barcha tumanlar bo'yicha saralangan, doimiy to'ldirib boriladigan alohida veb-sayt yaratish, unda har bir ustozning hikoyasi, yutug'i va ta'lim falsafasi mustahkam saqlanib qolishi. Bazaga qo'shilish uchun ustoz haqida batafsil ma'lumot yuborish va ekspertlar ko'rigidan o'tish talab etiladi — shu orqali faqat haqiqatan ham munosib, tekshirilgan hikoyalar joy oladi.");
+  });
+
+  bot.hears(t("menu.contact"), async (ctx) => {
+    await ctx.reply("Savol va takliflar uchun: @Fidoyi_support_bot");
   });
 
   // Public "👨‍🏫 Ustozlar" catalog — unauthenticated, published-only (see catalog.handler.ts).
@@ -126,6 +138,10 @@ bot.callbackQuery("recommender_phone:skip", async (ctx) => {
   // falls through to nomination/self-submission handling or the "unknown button" reply.
   bot.callbackQuery("catalog:regions", async (ctx) => {
     await ctx.answerCallbackQuery();
+    await catalog.showRegions(ctx);
+  });
+
+  bot.hears("👨‍🏫 Ustozlar", async (ctx) => {
     await catalog.showRegions(ctx);
   });
   bot.callbackQuery("catalog:noop", async (ctx) => {

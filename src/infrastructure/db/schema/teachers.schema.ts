@@ -34,6 +34,7 @@ export const teachers = pgTable(
     // to the winner (see MergeTeachersUseCase). This guarantees zero data loss.
     mergedIntoTeacherId: uuid("merged_into_teacher_id").references((): AnyPgColumn => teachers.id),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    channelPostedAt: timestamp("channel_posted_at", { withTimezone: true }),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => ({

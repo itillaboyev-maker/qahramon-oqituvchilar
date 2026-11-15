@@ -17,6 +17,10 @@ type RecommendationCard = {
   recommendationText: string | null;
   recommenderName: string | null;
   recommenderPhone: string | null;
+  teacherPhone: string | null;
+  experienceYearsText: string | null;
+  achievementsText: string | null;
+  studentImpactText: string | null;
   additionalInfo: string | null;
 };
 
@@ -24,22 +28,39 @@ function formatRecommendation(
   teacher: {
     fullName: string;
     school: string | null;
+    regionName?: string | null;
+    districtName?: string | null;
   },
   communityCount: number,
   r: RecommendationCard,
 ) {
   return [
     `👤 <b>${teacher.fullName}</b>`,
+    teacher.regionName || teacher.districtName
+      ? `📍 ${[teacher.regionName, teacher.districtName].filter(Boolean).join(", ")}`
+      : null,
     teacher.school ? `🏫 ${teacher.school}` : null,
     `📊 Mustaqil tavsiyalar: <b>${communityCount}</b> ta`,
     r.recommenderName
       ? `👤 Tavsiya qiluvchi: ${r.recommenderName}`
       : null,
-    r.recommenderPhone
-      ? `📞 ${r.recommenderPhone}`
+       r.recommenderPhone
+      ? `📞 Tavsiyachi: ${r.recommenderPhone}`
+      : null,
+    r.teacherPhone
+      ? `📞 Ustoz: ${r.teacherPhone}`
       : null,
     r.relationship
       ? `🤝 ${r.relationship}`
+      : null,
+    r.experienceYearsText
+      ? `\n📆 Ish staji: ${r.experienceYearsText}`
+      : null,
+    r.achievementsText
+      ? `\n🏆 Yutuqlari: ${r.achievementsText}`
+      : null,
+    r.studentImpactText
+      ? `\n🎓 Shogirdlari yutuqlari: ${r.studentImpactText}`
       : null,
     r.recommendationText
       ? `\n📝 ${r.recommendationText}`
@@ -81,7 +102,9 @@ export function registerModerationQueue(
     headerLines: string[] = [],
   ) {
     const [teacher, communityCount, mediaList] = await Promise.all([
-      teacherRepo.findById(rec.teacherId),
+      teacherRepo
+        .findPublishQueueDetailById(rec.teacherId)
+        .then((t) => t ?? teacherRepo.findById(rec.teacherId)),
       recommendationRepo.countIndependentByTeacherId(rec.teacherId),
       mediaRepo.listByRecommendationIds([rec.id]),
     ]);

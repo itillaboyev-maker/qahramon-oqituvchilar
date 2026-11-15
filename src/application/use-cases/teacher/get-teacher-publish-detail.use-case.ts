@@ -16,6 +16,10 @@ export interface PublicRecommendationPreview {
   studentImpactText: string | null;
   evidenceText: string | null;
   additionalInfo: string | null;
+  experienceYearsText: string | null;
+  recommenderName: string | null;
+  recommenderPhone: string | null;
+  teacherPhone: string | null;
 }
 
 export interface RecommendationWithMediaPreview {
@@ -98,6 +102,10 @@ export class GetTeacherPublishDetailUseCase {
           studentImpactText: recommendation.studentImpactText,
           evidenceText: recommendation.evidenceText,
           additionalInfo: recommendation.additionalInfo,
+          experienceYearsText: recommendation.experienceYearsText,
+          recommenderName: recommendation.recommenderName ?? null,
+          recommenderPhone: recommendation.recommenderPhone ?? null,
+          teacherPhone: recommendation.teacherPhone ?? null,
         },
         mediaSummary: summarizeMedia(
   mediaCountsByRecommendation.get(recommendation.id) ?? {

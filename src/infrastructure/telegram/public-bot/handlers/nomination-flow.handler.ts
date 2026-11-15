@@ -1,4 +1,4 @@
-import { InlineKeyboard, Keyboard, type Context } from "grammy";
+import { InlineKeyboard, type Context } from "grammy";
 import { eq } from "drizzle-orm";
 import type { Database } from "../../../db/client";
 import { regions, districts } from "../../../db/schema";
@@ -12,17 +12,20 @@ import { logger } from "../../../logging/logger";
 
 import { TEXT_LIMITS } from "../../../../shared/constants/security.constants";
 import type { R2MediaStorageService } from "../../../storage/R2MediaStorageService";
+
 type Step =
   | "teacher_name"
   | "region"
   | "district"
   | "school"
-  | "teacher_phone"
+  | "subject"
   | "relationship"
+  | "experience_years"
+  | "achievements"
+  | "student_impact"
   | "recommendation_text"
-  | "ask_more"
-  | "extra_info"
   | "media"
+  | "teacher_phone"
   | "recommender_name"
   | "recommender_phone"
   | "consent";
@@ -88,7 +91,59 @@ export function registerNominationFlow(
             return true;
           }
           data.school = school;
-          await this.askTeacherPhone(ctx, session.id, data);
+          await sessionStore.update(session.id, { currentStep: "subject", collectedData: data });
+          await ctx.reply(t("nomination.ask_subject"));
+          return true;
+        }
+
+        case "subject": {
+          const subject = text.trim();
+          if (!subject) {
+            await ctx.reply(t("nomination.ask_subject"));
+            return true;
+          }
+          data.subject = subject;
+          await this.askRelationship(ctx, session.id, data);
+          return true;
+        }
+
+        case "experience_years": {
+          const value = text.trim();
+          if (!value) {
+            await ctx.reply(t("nomination.ask_experience_years_retry"));
+            return true;
+          }
+          data.experienceYearsText = value;
+          await this.askAchievements(ctx, session.id, data);
+          return true;
+        }
+
+        case "achievements": {
+          const value = text.trim();
+          if (!value) {
+            await ctx.reply(t("nomination.ask_achievements"));
+            return true;
+          }
+          data.achievementsText = value;
+          await this.askStudentImpact(ctx, session.id, data);
+          return true;
+        }
+
+        case "student_impact": {
+          const value = text.trim();
+          if (!value) {
+            await ctx.reply(t("nomination.ask_student_impact"));
+            return true;
+          }
+          data.studentImpactText = value;
+          await sessionStore.update(session.id, { currentStep: "recommendation_text", collectedData: data });
+          await ctx.reply(t("nomination.ask_text"));
+          return true;
+        }
+
+        case "recommendation_text": {
+          data.recommendationText = text.trim();
+          await this.askMedia(ctx, session.id, data);
           return true;
         }
 
@@ -110,25 +165,11 @@ export function registerNominationFlow(
 
           data.teacherPhone = normalized;
 
-          await this.askRelationship(ctx, session.id, data);
+          await this.askRecommenderName(ctx, session.id, data);
 
           return true;
         }
 
-        case "recommendation_text": {
-          data.recommendationText = text.trim();
-          const kb = new InlineKeyboard()
-            .text(t("nomination.btn_add_more"), "more:yes").row()
-            .text(t("nomination.btn_finish"), "more:no");
-          await sessionStore.update(session.id, { currentStep: "ask_more", collectedData: data });
-          await ctx.reply(t("nomination.ask_more"), { reply_markup: kb });
-          return true;
-        }
-        case "extra_info": {
-          data.additionalInfo = text.trim();
-          await this.askMedia(ctx, session.id, data);
-          return true;
-        }
         case "recommender_name": {
           const value = text.trim();
 
@@ -254,12 +295,7 @@ export function registerNominationFlow(
     },
 
     async askTeacherPhone(ctx: Context, sessionId: string, data: Record<string, unknown>) {
-      const kb = new Keyboard()
-        .requestContact(t("nomination.btn_share_contact"))
-        .row()
-        .text(t("nomination.btn_skip"))
-        .resized()
-        .oneTime();
+      const kb = new InlineKeyboard().text(t("nomination.btn_skip"), "teacher_phone:skip");
 
       await sessionStore.update(sessionId, {
         currentStep: "teacher_phone",
@@ -278,6 +314,21 @@ export function registerNominationFlow(
       }
       await sessionStore.update(sessionId, { currentStep: "relationship", collectedData: data });
       await ctx.reply(t("nomination.ask_relationship"), { reply_markup: kb });
+    },
+
+    async askExperienceYears(ctx: Context, sessionId: string, data: Record<string, unknown>) {
+      await sessionStore.update(sessionId, { currentStep: "experience_years", collectedData: data });
+      await ctx.reply(t("nomination.ask_experience_years"));
+    },
+
+    async askAchievements(ctx: Context, sessionId: string, data: Record<string, unknown>) {
+      await sessionStore.update(sessionId, { currentStep: "achievements", collectedData: data });
+      await ctx.reply(t("nomination.ask_achievements"));
+    },
+
+    async askStudentImpact(ctx: Context, sessionId: string, data: Record<string, unknown>) {
+      await sessionStore.update(sessionId, { currentStep: "student_impact", collectedData: data });
+      await ctx.reply(t("nomination.ask_student_impact"));
     },
 
     async askRecommenderName(ctx: Context, sessionId: string, data: Record<string, unknown>) {
@@ -351,19 +402,6 @@ export function registerNominationFlow(
         return true;
       }
 
-      if (callbackData === "teacher_phone:skip") {
-        data.teacherPhone = null;
-        await ctx.answerCallbackQuery();
-        await this.askRelationship(ctx, session.id, data);
-        return true;
-      }
-
-      if (callbackData === "teacher_phone:share") {
-        await ctx.answerCallbackQuery();
-        await ctx.reply(t("nomination.ask_teacher_phone"));
-        return true;
-      }
-
       if (callbackData.startsWith("rel:")) {
         const relKey = callbackData.split(":")[1]!;
         if (!(relKey in RELATIONSHIP_LABELS)) {
@@ -373,26 +411,19 @@ export function registerNominationFlow(
           return true;
         }
         data.relationship = relKey as Relationship;
-        await sessionStore.update(session.id, { currentStep: "recommendation_text", collectedData: data });
         await ctx.answerCallbackQuery();
-        await ctx.reply(t("nomination.ask_text"));
-        return true;
-      }
-
-      if (callbackData === "more:yes") {
-        await sessionStore.update(session.id, { currentStep: "extra_info", collectedData: data });
-        await ctx.answerCallbackQuery();
-        await ctx.reply(t("nomination.ask_extra_info"));
-        return true;
-      }
-
-      if (callbackData === "more:no") {
-        await ctx.answerCallbackQuery();
-        await this.askMedia(ctx, session.id, data);
+        await this.askExperienceYears(ctx, session.id, data);
         return true;
       }
 
       if (callbackData === "media:done" || callbackData === "skip:media") {
+        await ctx.answerCallbackQuery();
+        await this.askTeacherPhone(ctx, session.id, data);
+        return true;
+      }
+
+      if (callbackData === "teacher_phone:skip") {
+        data.teacherPhone = null;
         await ctx.answerCallbackQuery();
         await this.askRecommenderName(ctx, session.id, data);
         return true;
@@ -404,7 +435,8 @@ export function registerNominationFlow(
         return true;
       }
 
-      if (callbackData === "skip:recommender_phone") {
+      if (callbackData === "recommender_phone:skip") {
+        data.recommenderPhone = null;
         await ctx.answerCallbackQuery();
         await this.askConsent(ctx, session.id, data);
         return true;
@@ -430,11 +462,14 @@ export function registerNominationFlow(
             school: data.school as string,
             relationship: data.relationship as Relationship,
             recommendationText: data.recommendationText as string,
-            additionalInfo: data.additionalInfo as string | undefined,
+            experienceYearsText: data.experienceYearsText as string | undefined,
+            achievementsText: data.achievementsText as string | undefined,
+            studentImpactText: data.studentImpactText as string | undefined,
             media: data.media as NominationMediaItem[] | undefined,
             recommenderName: data.recommenderName as string | undefined,
             recommenderPhone: data.recommenderPhone as string | undefined,
             teacherPhone: data.teacherPhone as string | null | undefined,
+            subject: data.subject as string | undefined,
             submittedByUserId: userId,
             consentGiven: true,
           });
@@ -451,44 +486,44 @@ export function registerNominationFlow(
           await ctx.reply(
             `❌ Xatolik:\n${err instanceof Error ? err.message : String(err)}`
           );
-        
+
+        }
+        return true;
       }
-      return true;
-    }
 
       return false;
-  },
+    },
 
     normalizePhone(value: string) {
-    const digitsOnly = value.replace(/[^0-9]/g, "");
-    if (!digitsOnly) return null;
-    if (digitsOnly.length < TEXT_LIMITS.PHONE_MIN || digitsOnly.length > TEXT_LIMITS.PHONE_MAX) {
-      return null;
-    }
-    return value.trim();
-  },
+      const digitsOnly = value.replace(/[^0-9]/g, "");
+      if (!digitsOnly) return null;
+      if (digitsOnly.length < TEXT_LIMITS.PHONE_MIN || digitsOnly.length > TEXT_LIMITS.PHONE_MAX) {
+        return null;
+      }
+      return value.trim();
+    },
 
     async handleContact(ctx: Context, userId: string, contact: { phone_number?: string | null }) {
-    const session = await sessionStore.get(userId, "public");
-    if (!session || session.flowType !== "nomination" || session.currentStep !== "teacher_phone") return false;
+      const session = await sessionStore.get(userId, "public");
+      if (!session || session.flowType !== "nomination" || session.currentStep !== "teacher_phone") return false;
 
-    const data = { ...session.collectedData } as Record<string, unknown>;
-    const phone = contact.phone_number?.trim();
-    if (!phone) {
-      await ctx.reply(t("nomination.phone_invalid"));
+      const data = { ...session.collectedData } as Record<string, unknown>;
+      const phone = contact.phone_number?.trim();
+      if (!phone) {
+        await ctx.reply(t("nomination.phone_invalid"));
+        return true;
+      }
+
+      const normalized = this.normalizePhone(phone);
+      if (!normalized) {
+        await ctx.reply(t("nomination.phone_invalid"));
+        return true;
+      }
+
+      data.teacherPhone = normalized;
+      await sessionStore.update(session.id, { collectedData: data });
+      await this.askRecommenderName(ctx, session.id, data);
       return true;
-    }
-
-    const normalized = this.normalizePhone(phone);
-    if (!normalized) {
-      await ctx.reply(t("nomination.phone_invalid"));
-      return true;
-    }
-
-    data.teacherPhone = normalized;
-    await sessionStore.update(session.id, { collectedData: data });
-    await this.askRelationship(ctx, session.id, data);
-    return true;
-  },
-};
+    },
+  };
 }

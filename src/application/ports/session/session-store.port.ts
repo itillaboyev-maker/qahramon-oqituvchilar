@@ -2,7 +2,7 @@ export interface BotSessionState<TData = Record<string, unknown>> {
   id: string;
   userId: string;
   botType: "public" | "admin";
-  flowType: "none" | "nomination" | "self_submission" | "moderation_review" | "teacher_edit";
+  flowType: "none" | "nomination" | "self_submission" | "moderation_review" | "teacher_edit" | "admin_input";
   currentStep: string | null;
   collectedData: TData;
 }

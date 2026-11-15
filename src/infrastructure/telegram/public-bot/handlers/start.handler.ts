@@ -1,5 +1,5 @@
 import type { Context } from "grammy";
-import { mainMenuKeyboard } from "../keyboards/main-menu.keyboard";
+import { mainMenuKeyboard, persistentMenuKeyboard } from "../keyboards/main-menu.keyboard";
 import type { RegisterUserUseCase } from "../../../../application/use-cases/user/register-user.use-case";
 import { t } from "../../../../i18n/translate";
 
@@ -15,7 +15,7 @@ export function startHandler(registerUser: RegisterUserUseCase) {
       lastName: from.last_name ?? null,
     });
 
-    await ctx.reply(t("start.welcome"));
+    await ctx.reply(t("start.welcome"), { reply_markup: persistentMenuKeyboard() });
     await ctx.reply(t("menu.title"), { reply_markup: mainMenuKeyboard() });
   };
 }
@@ -47,6 +47,7 @@ export function checkSubscriptionHandler(
 
   await ctx.answerCallbackQuery();
 
+  await ctx.reply(t("menu.persistent_ready"), { reply_markup: persistentMenuKeyboard() });
   await ctx.reply(t("menu.title"), {
     reply_markup: mainMenuKeyboard(),
   });

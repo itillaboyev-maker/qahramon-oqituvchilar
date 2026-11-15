@@ -14,12 +14,13 @@ export const recommendations = pgTable(
     submittedByUserId: uuid("submitted_by_user_id").references(() => users.id),
 
     // Essential fields — collected in the fast (<2 min) submission flow
-    recommenderName: varchar("recommender_name", { length: 255 }),
-    recommenderPhone: varchar("recommender_phone", { length: 20 }), // optional, never required
-    teacherPhone: varchar("teacher_phone", { length: 20 }), // optional public-flow teacher contact number, separate from recommenderPhone
+       recommenderName: varchar("recommender_name", { length: 255 }),
+    recommenderPhone: varchar("recommender_phone", { length: 20 }), // optional, never required — the RECOMMENDER's own phone
+    teacherPhone: varchar("teacher_phone", { length: 20 }), // optional — the TEACHER's phone, as given by the recommender
     relationship: relationshipEnum("relationship"),
     submissionType: submissionTypeEnum("submission_type").notNull(),
     recommendationText: text("recommendation_text"), // "why do you recommend this teacher"
+    experienceYearsText: varchar("experience_years_text", { length: 100 }), // free-text claim, e.g. "15 yil"
 
     // Extended fields — optional, collected only if the user chooses to add more
     achievementsText: text("achievements_text"),
